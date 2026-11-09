@@ -4,6 +4,35 @@ All notable changes, grouped by build phase. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 3: AI processing pipeline (2026-11-09)
+
+#### Added
+- **LangGraph pipeline** `backend/app/pipeline/graph.py`: `normalize -> prefilter -> classify -> gate -> embed -> near_duplicate_check -> store`, one graph run per `new` item, up to `LLM_CONCURRENCY` (5) in parallel, in pages of 50. A Postgres advisory lock prevents overlapping runs. `store` writes the annotation and the item status in one transaction, only while the item is still `new` (idempotent re-runs). Rejected items keep their annotation and reason. Pure decision logic (HTML/whitespace normalization, English heuristic, keyword pre-filter, gate) is in `pipeline/nodes.py`.
+- **Classifier** `backend/app/ai/classify.py` + `backend/app/prompts/classify.md` (`classify-v2`): category list rendered from the DB into a cached system prompt; structured outputs with a strict JSON schema (category slugs and content types as enums); Pydantic validation with one repair call; tokens, latency, attempts, model, prompt version, prompt hash and estimated cost stored on `ai_annotations`. A test pins the prompt file's hash to `PROMPT_VERSION`.
+- **Provider interface** `backend/app/ai/llm.py`: `LLMClient` / `LLMError(retryable, fatal)` with the Anthropic implementation (explicit connect/read timeouts, SDK retries with Retry-After, error classification, no prompt text in errors).
+- **Embeddings** `backend/app/ai/embeddings.py`: fastembed `BAAI/bge-small-en-v1.5` (384-dim), lazy and thread-safe. Near-duplicates: cosine > 0.92 within ±14 days, with similarity and reason stored. Failed embeddings stay pending and are filled by the next run.
+- **Spend controls**: `MAX_LLM_ITEMS_PER_RUN`, `DAILY_LLM_BUDGET_USD` (from per-page `pipeline_runs.cost_usd_estimate`), `pipeline_runs.stop_reason`; per-item retry limit (3) and run abort after 5 consecutive provider failures.
+- **Durable jobs** `backend/app/jobs.py` + migration `0002`: `jobs` table (pending, running, succeeded, retry_wait, dead_letter, cancelled), `FOR UPDATE SKIP LOCKED` claims, heartbeat leases with reclaim, full-jitter backoff, dead letters, manual retry/cancel CLI, one active job per kind (partial unique index).
+- **Worker** `backend/app/worker.py`: APScheduler enqueues `ingest_all` every `INGEST_INTERVAL_MINUTES`; the main loop claims and runs jobs; a finished ingest queues `pipeline`. Graceful SIGTERM: stop claiming, stop at the next safe point, release the job. Compose: `stop_grace_period: 60s` and a `models` volume for the embedding cache.
+- CLIs: `python -m app.pipeline [--limit N] [--max-llm-items N] [--reprocess-outdated]`, `python -m app.jobs list|enqueue|retry|cancel`.
+- **Evaluation**: `backend/scripts/eval_classifier.py` and `backend/tests/fixtures/eval_set.json` (40 real items, agent-labelled, human review pending). Results in `docs/AI_EVALUATION.md`; configuration and costs in `docs/AI_CONFIG.md`.
+- Migration `0002`: `jobs`; `items.ai_attempts`, `items.status_reason`; `ai_annotations.attempts`; `pipeline_runs.kind`, `pipeline_runs.stop_reason`.
+- `config/sources.yaml`: optional `dc_specific` (true for `dcd`, `dck`), so the pre-filter always passes them.
+- Settings / `.env.example`: `CLASSIFIER_EFFORT`, `CLASSIFIER_INPUT_USD_PER_MTOK`, `CLASSIFIER_OUTPUT_USD_PER_MTOK`, `DAILY_LLM_BUDGET_USD`, `LLM_CONCURRENCY`, `LLM_TIMEOUT_SECONDS`, `NEAR_DUPLICATE_THRESHOLD`, `JOB_LEASE_SECONDS`, `FASTEMBED_CACHE_PATH`.
+- Tests: pipeline unit tests (normalize, language, pre-filter, gate, validation and repair, refusal, cost, prompt pinning, injection escaping, provider error mapping, backoff), pipeline DB tests (every outcome, idempotent re-run, near-duplicates in one run and across runs, transient failures, provider outage, bad credentials, invalid output, item cap, daily limit, cost, embedding failure and backlog, overlapping runs, reprocess, shutdown), job and worker DB tests (dedupe, concurrent claims, backoff to dead letter, permanent failure, lease reclaim, release/cancel, worker outcomes, scheduler tick). An autouse fixture fails any real Anthropic call.
+
+#### Changed vs. plan (see docs/DECISIONS.md D-024 to D-028)
+- Structured outputs (`output_config.format`) instead of forced tool use, which current Opus/Sonnet/Fable models reject.
+- Single-scheduler guard is a unique index on active jobs instead of an advisory scheduler lock; the pipeline run still takes an advisory lock.
+- Near-duplicate canonical item = the item processed first.
+- The reprocess-old-prompt action is a CLI flag now; the Admin button is Phase 8.
+- Prompt `classify-v1` -> `classify-v2` after evaluation run 1 showed title-only HN items being cut by the quality gate.
+
+#### Fixed
+- `logging.py`: the Anthropic SDK's `httpx2` per-request INFO lines are silenced like `httpx`.
+- Language heuristic (found in the live run): the first version judged text by its share of English function words, so terse English GitHub descriptions plus an `owner/repo` title looked non-English. 283 repos were rejected without reaching the classifier. It now requires positive evidence of another language. The 289 affected items were re-queued and re-run (192 processed). Regression tests use the real descriptions and fail on the old heuristic.
+- Pre-filter rejection reasons were not stored. `items.processing_error` became `items.status_reason` (migration 0002 not yet released) and records the pre-filter or gate reason as well as errors.
+
 ### Phase 2: Ingestion (2026-11-09)
 
 #### Added

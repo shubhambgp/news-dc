@@ -199,3 +199,160 @@ Second full run, `python -m app.ingest --all --since-days 365` (same window), ex
 ### Not verified (BLOCKED)
 - Ingestion inside `docker compose` (`docker compose run --rm worker python -m app.ingest --all --since-days 365`): no Docker on this machine.
 - CI on GitHub: not pushed.
+
+## Phase 3 (2026-11-09)
+
+Environment: same machine and same throwaway PostgreSQL 18.6 + pgvector 0.8.1 cluster as Phase 2 (port 55433; `newsdc` holds the live Phase 2 data, `newsdc_test` is for pytest). No Docker. `.env` (gitignored, mode 600) holds the human-supplied `ANTHROPIC_API_KEY`, `CLASSIFIER_MODEL=claude-haiku-5-5` and the Haiku 5.5 prices.
+
+### Provider checks (live)
+| Check | Result |
+|---|---|
+| `client.models.retrieve("claude-haiku-5-5")`, `("claude-sonnet-5-5")` | both `OK` ("Claude Haiku 5.5", "Claude Sonnet 5.5"), `max_tokens` 128000 |
+| Pricing page (platform.claude.com/docs/en/about-claude/pricing) | Haiku 5.5, prompts ≤ 100k tokens: $0.10 input, $0.125 5-min cache write, $0.01 cache read, $0.50 output per MTok |
+| Two classify calls on one hand-written item, then a third raw call | `tokens_in 3672, tokens_out 386, cost 0.000649` then `0.000237`; third call `cache read 3536 write 0 in 136`: **prompt caching works**. Output was valid and on-topic (relevance 95, `power-energy`, `investment`) |
+| fastembed `BAAI/bge-small-en-v1.5` | downloaded (about 17 s), 384 dims, unit norm; cosine 0.80 for two cooling sentences, 0.43 vs an unrelated sentence |
+
+### Automated checks (final state)
+| Command | Result |
+|---|---|
+| `uv lock --check` | `Resolved 112 packages` (no dependency changes) |
+| `uv run ruff format --check .` | `42 files already formatted` |
+| `uv run ruff check .` | `All checks passed!` |
+| `uv run mypy app` | `Success: no issues found in 25 source files` |
+| `TEST_DATABASE_URL=...newsdc_test uv run pytest -q` | `188 passed` (new: 50 pipeline unit, 14 pipeline DB, 18 jobs/worker DB, 1 ingest shutdown) |
+| `uv run pytest -q` (no DB) | `134 passed, 54 skipped` |
+| No paid calls in tests | autouse fixture replaces `Messages.create` with an AssertionError; tests inject `FakeLLM` |
+
+Failures along the way (all fixed): migration downgrade used the full constraint name, which the naming convention prefixed again (`ck_pipeline_runs_ck_pipeline_runs_kind_valid`); mypy on the SDK's typed params (`httpx2.Timeout`, TypedDict request params); ruff B008 in a test; the first English heuristic flagged a German test sentence because it contains "in".
+
+### Migration on the live DB
+`uv run alembic upgrade head`: `Running upgrade 0001 -> 0002`. `python -m app.seed`: 14 categories, 11 sources; `dc_specific` true for `dcd`, `dck`. After the column rename (below), the live DB was aligned by hand with `ALTER TABLE items RENAME COLUMN processing_error TO status_reason`, which is what the final 0002 creates (the test DB is rebuilt from the migration on every run).
+
+### Evaluation
+Two runs of `uv run python scripts/eval_classifier.py` (full output summarised in AI_EVALUATION.md):
+- `classify-v1`: TP 15, FN 5, FP 0, TN 20 → precision 15/15, recall 15/20; category strict 16/20, lenient 18/20; $0.0110.
+- `classify-v2`: TP 20, FN 0, FP 2, TN 18 → precision 20/22, recall 20/20; category strict 16/20, lenient 18/20; $0.0116.
+
+### Acceptance 1: ≥ 500 items with `status = processed`
+Run 29: `python -m app.pipeline --max-llm-items 4000` on the full backlog (3,895 items, all `new`), exit code 0:
+```
+"run_id": 29, "status": "succeeded",
+"counts": {"processed": 2415, "rejected_ai": 1093, "rejected_prefilter": 310, "duplicate": 77},
+"cost_usd": 1.063929, "stop_reason": null, "error": null
+```
+34 min 42 s, no ERROR or WARNING log lines.
+
+**Bug found in the live data:** 289 of the 310 pre-filter rejections said "non-English". 283 of those were GitHub repos with terse English descriptions (e.g. `xukelvin24665-glitch/gridweave` "Deadline-safe co-scheduling of AI compute, renewable power, and battery storage"). The `owner/repo` title plus few English function words fell under the 15% ratio. Fix: non-English now needs positive evidence (mostly non-Latin letters, or ≥ 2 function words of another Latin-script language outnumbering English ones). Regression test `test_prefilter_passes_terse_english_repo_descriptions` uses the real strings; replayed against the old function it **fails 2 of 2**, and passes with the fix. The pre-filter reasons had also not been stored; that was fixed (`status_reason`) and backfilled for run 29 (deterministic recomputation; AI reasons copied from `ai_annotations.reject_reason`).
+
+The 289 items were reset to `new` and run 30 processed them, exit code 0:
+```
+"run_id": 30, "status": "succeeded",
+"counts": {"rejected_prefilter": 31, "rejected_ai": 65, "processed": 192, "duplicate": 1},
+"cost_usd": 0.064484
+```
+The 27 items still rejected as non-English were checked one by one: all are Chinese, Korean, Japanese, Russian, Spanish, French or Portuguese descriptions.
+
+**Final counts by status (3,895 unique items):**
+
+| Status | Items |
+|---|---|
+| processed | **2,607** |
+| rejected_ai | 1,158 |
+| duplicate | 78 |
+| rejected_prefilter | 52 (27 non-English, 25 no DC keywords) |
+| failed | 0 |
+| new | 0 |
+
+**By source (primary source):**
+
+| Source | Total | processed | rejected_ai | rejected_prefilter | duplicate |
+|---|---|---|---|---|---|
+| hn | 2,482 | 1,502 | 906 | 0 | 74 |
+| github | 760 | 545 | 185 | 27 | 3 |
+| arxiv | 499 | 462 | 36 | 0 | 1 |
+| dck | 50 | 48 | 2 | 0 | 0 |
+| nyt_tech | 26 | 7 | 14 | 5 | 0 |
+| dcd | 26 | 19 | 7 | 0 | 0 |
+| ft_tech | 26 | 6 | 6 | 14 | 0 |
+| semianalysis | 20 | 13 | 1 | 6 | 0 |
+| sth | 6 | 5 | 1 | 0 | 0 |
+
+**Processed by primary category:** ai-compute-gpus 640, optimization 306, power-energy 273, site-selection 217, networking 200, economics-finance 187, regulation 186, dc-infrastructure 153, sustainability 98, hyperscaler-investments 98, emerging-tech 86, cooling 63, ai-agentic 55, security 45 (all 14 used).
+**Processed by content type:** news 1,032, engineering 709, research 572, investment 294.
+**Annotations:** 3,843, all `classify-v2`; $1.128 total; 15.70M input / 1.62M output tokens; mean latency 2,712 ms; 0 repair retries. Every processed item has an embedding (0 pending).
+
+- **2,607 ≥ 500: PASS.** All records are real ingested items; nothing synthetic.
+
+### Acceptance 2: spot check, 20 random processed and 20 random rejected
+`setseed(0.7)`, `ORDER BY random() LIMIT 20` per group. Verdicts are the **agent's**; human spot check pending.
+
+Processed (20/20 judged correct to publish):
+
+| Item | Source | Title | Rel/Qual | Category | Agent verdict |
+|---|---|---|---|---|---|
+| 654 | hn | xAI built an illegal power plant to power its data center | 92/85 | power-energy | correct; summary facts (Earthjustice, NAACP) are in the extracted text |
+| 642 | hn | Data center drains 30M gals of water — until residents complained | 85/45 | sustainability | correct |
+| 3294 | arxiv | A Network Arena for Benchmarking AI Agents on Network Troubleshooting | 72/78 | ai-agentic | correct (networking also fits) |
+| 3009 | arxiv | Space AI Infrastructure: Where the Edge Meets the Orbital Cloud | 70/70 | emerging-tech | correct |
+| 179 | hn | HSBC Seeks to Hedge Data Center Debt with Credit Risk Insurance | 85/50 | economics-finance | correct; title-only, summary says no further text |
+| 3014 | arxiv | Capturing Electrical Windows Through Reconfigurable Optical Networks | 88/78 | optimization | correct |
+| 3960 | github | Physics-Informed-Cooling-for-Computing-Charging-Hubs | 88/50 | cooling | correct |
+| 2870 | hn | Nvidia says its GPUs are a 'generation ahead' of Google's AI chips | 75/50 | ai-compute-gpus | acceptable (indirect) |
+| 2812 | hn | Nvidia can sell H200 AI chips to China, Donald Trump says | 75/50 | ai-compute-gpus | acceptable (export policy; regulation also fits) |
+| 364 | hn | Data Center Foes' Newest Tack: Sue Locals over Approval Process | 85/50 | site-selection | correct |
+| 818 | hn | CoreWeave Hid Data Center Delays, Investors Say | 72/55 | hyperscaler-investments | correct; "class action" is in the extracted text |
+| 2594 | hn | Nvidia's Moat Is Leaking: The Rise of High-Bandwidth CPUs | 72/40 | ai-compute-gpus | acceptable, borderline quality |
+| 2794 | hn | China government-approved AI hw suppliers: Cambricon and Huawei in | 72/50 | ai-compute-gpus | correct |
+| 3342 | arxiv | A Survey on AI Datacenter Hardware Architecture | 88/78 | ai-compute-gpus | correct |
+| 220 | hn | Drones Hit Third Yandex Data Center Disrupting over 80 Services | 85/70 | security | correct; "Vladimir" is in the extracted text |
+| 3187 | arxiv | The Anatomy of Silent Data Corruption: GPU Error Pattern Study | 78/82 | ai-compute-gpus | correct |
+| 3771 | github | ndom91/ai-infra-monitoring | 62/45 | economics-finance | correct |
+| 658 | hn | OpenAI-Oracle data center construction proceeds despite Michigan vote | 95/82 | site-selection | correct; "$16 billion", "21 million", "Saline" are in the extracted text |
+| 2815 | hn | Trump Clears Sale of More Powerful Nvidia A.I. Chips to China | 65/50 | regulation | correct |
+| 41 | dck | Rethinking the Blind-Mate Connection | 85/50 | cooling | correct |
+
+Rejected (17/20 judged correct; 3 borderline):
+
+| Item | Source | Title | Rel/Qual | Reason stored | Agent verdict |
+|---|---|---|---|---|---|
+| 939 | hn | John Carmack on why he would push back against anti-datacenter efforts | 55/25 | quality 25 < 40 | **borderline**: on topic, thin title |
+| 2415 | hn | NVIDIA Nemotron 3 Super | 55/30 | quality 30 < 40 | correct |
+| 1722 | hn | Nvidia DLSS 5 Neural Rendering Now Works on AMD Radeon GPUs | 10/35 | consumer gaming graphics mod | correct |
+| 2844 | hn | Nvidia announces new open AI models for autonomous driving research | 25/40 | autonomous driving tooling | correct |
+| 2727 | hn | Nvidia Bought the Bouncer | 40/25 | vague headline | correct |
+| 2107 | hn | Nvidia and Microsoft Reinvent Windows PCs for the Age of Personal AI | 18/55 | consumer PCs | correct |
+| 2647 | hn | Building voice agents with Nvidia open models | 35/62 | application tutorial | correct |
+| 964 | hn | Is It Impossible to Cool a Datacenter in Space? (Scott Manley) [video] | 72/35 | quality 35 < 40 | **borderline**: relevant topic, video with title only |
+| 2666 | hn | GPU Memory Allocation Bugs with Nvidia on Linux and Wayland | 10/45 | consumer desktop Linux | correct |
+| 1668 | hn | Run QWEN3.8 27B on 16gb Nvidia GPUs | 30/25 | consumer local model | correct |
+| 2636 | hn | Jensen Huang says robots could be 'AI immigrants' | 20/35 | robotics commentary | correct |
+| 3785 | github | akirakubota-dev/akirakubota.com | 25/25 | personal portfolio | correct |
+| 2393 | hn | Hands-On with DLSS 5 [video] | 15/15 | consumer gaming | correct |
+| 3385 | arxiv | When Is Availability-Aware Training Worth It? | 40/68 | satellite training, indirect | correct |
+| 4203 | github | aorus-waterforce-linux | 30/40 | consumer AIO cooler tool | correct |
+| 1261 | hn | You Had Me at "Hello": A Chinese-Language Framework Targeting AI Infrastructure | 45/62 | relevance 45 < 55 | **borderline**: security research on AI infrastructure |
+| 2378 | hn | New Nvidia DLSS Tech Gives Characters AI Slop Faces | 35/55 | consumer gaming | correct |
+| 4209 | github | omarchy-aeolus | 15/35 | consumer fan control | correct |
+| 2258 | hn | Nvidia Ising – Open AI Models for Quantum Computing | 45/62 | no facility angle | correct |
+| 1646 | hn | Owed a billion dollars in Nvidia stock | 20/40 | personal essay | correct |
+
+Observations: title-only HN summaries state that no further text was available instead of guessing (R-014). The borderline rejections sit just under the relevance or quality thresholds, which are configurable. The pre-filter's earlier sample showed two SemiAnalysis posts (Huawei-DeepSeek, DRAM/SSD offloading) rejected for having no keyword; arguably relevant, noted as a pre-filter trade-off.
+
+- **PASS (agent spot check recorded); human spot check pending.**
+
+### Acceptance 3: evaluation results recorded
+- AI_EVALUATION.md and AI_CONFIG.md hold both runs with denominators and limitations. **PASS**; the human review of the 40 labels is pending.
+
+### Worker end to end (live DB, real sources and LLM)
+`uv run python -m app.worker`, started 20:32:46 IST:
+- APScheduler enqueued job 1 `ingest_all` at start ("scheduled ingest"). The worker claimed it and ran all 9 enabled sources (pipeline_runs 31–39, all `succeeded`: hn 34 fetched / 2 new, github 94 / 0, dcd 18 / 1, ft_tech 21 / 0, and so on; arXiv 0). The job finished `succeeded` and queued job 2 `pipeline` with the same trigger.
+- Job 2 ran the pipeline (run 40, `succeeded`): 3 new items → 2 processed, 1 duplicate. Job 2 `succeeded`, attempt 1.
+- SIGTERM to the idle worker at 20:47:40: log shows `worker stopped` and `Scheduler has been shut down` in the same second; exit without error. 0 ERROR lines in the worker log (one INFO `extraction fetch failed`, an ignored full-text fetch).
+- My watcher script meant to send SIGTERM automatically had a shell quoting bug (`-c: command not found`), so the worker idled about 14 minutes after its jobs and **SIGTERM was sent by hand**. Shutdown **during** a running job (release to `pending`) was not exercised live; it is covered by `test_shutdown_during_ingest_releases_the_job` and `test_shutdown_stops_between_pages`.
+
+**Final counts after the worker run:** processed **2,609**, rejected_ai 1,158, duplicate 79, rejected_prefilter 52 (3,898 unique items).
+
+### Not verified (BLOCKED / pending)
+- Worker and pipeline inside `docker compose` (incl. the `models` volume, `stop_grace_period`): no Docker on this machine (R-001).
+- CI on GitHub: not pushed.
+- Human review of the 40 eval labels and a human spot check of processed and rejected items: pending.

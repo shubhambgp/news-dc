@@ -2,7 +2,7 @@
 
 AI-powered discovery platform for Data Center news and research.
 
-> Status: **Phase 2 (ingestion)**. See [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) and [plan.md](plan.md) for the build plan.
+> Status: **Phase 3 (AI pipeline)**. See [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) and [plan.md](plan.md) for the build plan.
 
 ## Quick start (Docker)
 
@@ -27,7 +27,10 @@ uv run alembic upgrade head                # create/upgrade the schema (needs pg
 uv run uvicorn app.main:app --reload       # http://localhost:8000
 uv run python -m app.ingest --all --since-days 365   # backfill every enabled source
 uv run python -m app.ingest --source hn              # one source; default window = since last success
-uv run python -m app.worker                # scheduler process (jobs are registered in Phase 3)
+uv run python -m app.pipeline --limit 100  # classify new items (needs ANTHROPIC_API_KEY + CLASSIFIER_MODEL)
+uv run python -m app.worker                # scheduled ingest -> pipeline via the durable jobs table
+uv run python -m app.jobs list             # jobs; also: enqueue <kind> | retry <id> | cancel <id>
+uv run python scripts/eval_classifier.py   # classifier evaluation (about 40 paid LLM calls)
 
 # frontend
 cd frontend
@@ -60,3 +63,13 @@ Sources live in `config/sources.yaml`; each one was checked for a working endpoi
 (`hackernews`, `rss`, `arxiv`, `github`). The runner (`runner.py`) dedupes by canonical-URL hash in the
 database, records each source's provenance in `item_sources`, writes one `pipeline_runs` row per source,
 and checkpoints progress so an interrupted backfill resumes. One failing source never stops the others.
+
+## AI pipeline
+
+`backend/app/pipeline/graph.py` is a LangGraph graph run once per new item:
+`normalize -> prefilter -> classify (LLM) -> gate -> embed -> near_duplicate_check -> store`.
+The keyword pre-filter costs nothing; the classifier uses the prompt in `backend/app/prompts/classify.md`
+with structured JSON output, validated by Pydantic. Rejected items keep their annotation and reason.
+Spend is capped per run (`MAX_LLM_ITEMS_PER_RUN`) and per day (`DAILY_LLM_BUDGET_USD`).
+The worker enqueues jobs into a Postgres `jobs` table (claims with `SKIP LOCKED`, leases, retries,
+dead letters). Details: [docs/AI_CONFIG.md](docs/AI_CONFIG.md), evaluation: [docs/AI_EVALUATION.md](docs/AI_EVALUATION.md).

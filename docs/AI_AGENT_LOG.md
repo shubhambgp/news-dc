@@ -57,3 +57,25 @@ Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
 | Bug found in live backfill: transaction held open during enrichment → `IdleInTransactionSessionTimeout` on arXiv and GitHub | Agent | Seen in backfill run 1. Fixed; regression test confirmed failing before the fix and passing after; arXiv and GitHub re-run successfully |
 | Docs: CHANGELOG, DECISIONS D-016 to D-023, RISKS R-009 to R-012, README, CLAUDE.md, this log, VERIFICATION_LOG, PHASE_STATUS | Agent | Manual review. Pending human verification |
 | Diff review and commit | Agent | `git diff --stat`, `git status`, secret grep before commit |
+
+## Phase 3: AI processing pipeline
+
+Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
+
+| Task | Done by | How it was verified |
+|---|---|---|
+| Re-read Phase 3, §11.4, §11.5, §11.10–§11.13, §13; inspected Phase 2 code and the live DB | Agent | n/a |
+| Supplied `ANTHROPIC_API_KEY` | Human | Pasted into the chat; the agent wrote it to the gitignored `.env` (mode 600). **The human should rotate this key**, since it is in the chat transcript |
+| Verified model IDs and prices (`claude-haiku-5-5`) | Agent | Models API call with the key; pricing page fetched 2026-11-09 (D-024). Pending human verification |
+| Migration 0002 (`jobs`, pipeline columns) and models | Agent | `test_models_match_migrations`, downgrade/upgrade round trip, applied to the live DB. Pending human verification |
+| Provider interface + Anthropic client (`app/ai/llm.py`) | Agent | Unit tests for error classification; 3 live calls (cache hit confirmed). Pending human verification |
+| Classifier, schema, validation, repair retry, prompt `classify.md` | Agent | 41 unit tests; live eval runs. Pending human verification |
+| Prompt v1 → v2 after eval run 1 | Agent | Eval run 2 (D-028). Pending human verification |
+| LangGraph pipeline, near-duplicates, spend limits, CLI | Agent | 14 DB integration tests with fake LLM/embedder; live runs 29 and 30 (2,609 processed). Pending human verification |
+| Bug found in the live run: English heuristic rejected 283 terse English GitHub descriptions; pre-filter reasons not stored | Agent | Seen in run 29's rejection reasons. Fixed; regression test fails 2/2 on the old heuristic; 289 items re-run (run 30) |
+| Durable jobs + worker (leases, backoff, dead letter, shutdown) | Agent | 18 DB tests (incl. concurrent claims, lease reclaim); live worker run: scheduled ingest → pipeline job → SIGTERM (VERIFICATION_LOG). Shutdown during a running job only tested in pytest. Pending human verification |
+| Evaluation set (40 real items, labels) | Agent | Labelled blind before classification. **Human review of every label: pending** |
+| Eval script and results | Agent | Two live runs recorded in AI_EVALUATION.md |
+| Spot check of 20 processed + 20 rejected items | Agent | Agent's own judgement recorded in VERIFICATION_LOG. **Human spot check pending** |
+| Docs: CHANGELOG, DECISIONS D-024–D-028, RISKS, AI_CONFIG, AI_EVALUATION, README, CLAUDE.md, .env.example, this log, VERIFICATION_LOG, PHASE_STATUS | Agent | Manual review. Pending human verification |
+| Diff review and commit | Agent | `git diff --stat`, `git status`, secret grep before commit |

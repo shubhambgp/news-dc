@@ -135,3 +135,42 @@ Each entry: context, options, decision, why, trade-offs, and whether it changes 
 
 ## D-023 (2026-11-09): GitHub `published_at` is the repository creation date
 - Stars are stored as `points`, `pushed_at` limits the search to active repos, and `created_at` is the publication date. "Published" should not move every time someone pushes.
+
+## D-024 (2026-11-09): Classifier model, structured output and effort
+- **Context:** Phase 3 asks for "tool use / structured output" with a strict schema, a model ID from env, and model IDs verified against official docs (§11.5).
+- **Verified:** the Models API returned `claude-haiku-5-5` ("Claude Haiku 5.5") and `claude-sonnet-5-5` for this key. The pricing page (checked 2026-11-09) lists Haiku 5.5 at $0.10/MTok input, $0.125 cache write, $0.01 cache read and $0.50 output for prompts up to 100k tokens. The minimum cacheable prefix for Haiku 5.5 is 512 tokens; the classify prompt is about 3,500 tokens and was confirmed to cache (`cache_read_input_tokens = 3536` on the second call).
+- **Options:** (a) forced `tool_choice` with a tool schema; (b) structured outputs (`output_config.format` with a JSON schema). Forced `tool_choice` returns a 400 on several current models (Opus 5.5, Sonnet 5.5, Fable 5.1), so (a) would tie the code to a model family.
+- **Decision:** (b), with the category slugs and content types as enums in the schema, then Pydantic validation and one repair call. `CLASSIFIER_MODEL=claude-haiku-5-5` is set in the local `.env` only. Code and `.env.example` still default to empty (D-007). `CLASSIFIER_EFFORT=low` (classification does not benefit from deep reasoning; it is configurable and can be emptied for models without `effort`).
+- **Trade-offs:** structured outputs guarantee parseable JSON but not every rule (score ranges, unknown categories are still checked by Pydantic). A Haiku-class model is cheaper but less nuanced than Sonnet; the eval (AI_EVALUATION.md) is the evidence it is good enough.
+- **Changes plan:** minor (structured outputs instead of forced tool use; both are allowed by the plan's wording).
+
+## D-025 (2026-11-09): Provider interface, retries and failure classes
+- `app/ai/llm.py` defines `LLMClient` (one method, `complete_json`) and `LLMError(retryable, fatal)`. Pipeline code never sees vendor types.
+- Transient errors (429, 5xx including 529, timeouts, connection errors) are retried by the Anthropic SDK (`max_retries=3`, exponential backoff, honours Retry-After). We don't add a second retry layer.
+- What still fails is classified: auth/permission/unknown model = **fatal** (abort the run, the job goes to dead_letter); 400 or refusal = **permanent for that item** (status `failed`); transient = **retry later** (item stays `new`, `ai_attempts` + 1, `failed` after 3). Five transient failures in a row abort the run as "provider unavailable" (job retried with backoff). Invalid output twice = `failed`.
+- Logged errors carry the exception type, status and the SDK's message only, never the prompt or article text.
+
+## D-026 (2026-11-09): Durable jobs without an advisory scheduler lock
+- **Context:** §11.4 asks for an atomic claim, leases, backoff, dead letters, manual retry, idempotent handlers, a single-scheduler guard and defined shutdown.
+- **Decision:** a `jobs` table (migration 0002) with kinds `ingest_all` and `pipeline`. The single-scheduler guard is a **partial unique index** (`one active job per kind`), plus a "not enqueued within 0.9 × interval" check, so replicas' ticks no-op in the database. This is the "or equivalent" in §11.4 and needs no long-held lock connection. The pipeline itself additionally holds `pg_try_advisory_lock` so a CLI run and a worker run never overlap.
+- Leases: 600 s, renewed by a heartbeat thread every 60 s. A lease that expires on the last attempt goes to dead_letter. Backoff: full jitter, 60 s base, 1 h cap, `max_attempts` 3.
+- Shutdown: SIGTERM stops claiming; ingestion stops between sources and the pipeline between pages of 50 items; the job is released to `pending` without spending an attempt. Compose gives the worker `stop_grace_period: 60s`; past that, lease expiry recovers the job.
+- Manual actions are CLI for now (`python -m app.jobs list|enqueue|retry|cancel`). Admin endpoints are Phase 8.
+- **Changes plan:** no.
+
+## D-027 (2026-11-09): Pipeline details
+- **Prefilter:** word-bounded, case-insensitive match of category keywords plus a small general DC vocabulary (`app/pipeline/nodes.py`); score 0 rejects unless the source is DC-specific. DC-specific is a new optional `dc_specific: true` field in `sources.yaml` (set for `dcd` and `dck`).
+- **Language:** no new dependency. Text is non-English only on positive evidence: more than 30% non-ASCII letters, or at least two function words of another Latin-script language (German, Spanish, French, Portuguese, Dutch) that outnumber the English ones. Such items are rejected unless the title has a DC keyword (plan: "skip non-English unless the title is clearly relevant"). The first version (English function-word ratio) wrongly rejected 283 terse English GitHub descriptions in the live run and was replaced (VERIFICATION_LOG, Phase 3).
+- **Near-duplicates:** `title + summary` embedding, cosine > 0.92 with a `processed` item published within ±14 days (HNSW with `hnsw.iterative_scan = relaxed_order`, pgvector ≥ 0.8). The **already-processed item stays canonical**; the new one becomes `duplicate` with `duplicate_of`, the similarity and a reason string. Items running in parallel in the same run are also compared against each other in memory under a lock, so concurrent duplicates are caught. The plan allows "earlier or higher-quality"; we pick "first processed" and do not flip published items.
+- **Embedding failures:** the item stays `processed` with `embedding` NULL and a `status_reason`; each run first embeds that backlog.
+- **Audit trail:** `items.status_reason` says why an item has its status: the pre-filter or gate reason, the last LLM error (items left `new` or `failed`), or a pending embedding. AI rejections also keep the full annotation.
+- **Idempotency:** `store` updates an item only `WHERE status = 'new'`, in the same transaction as the annotation upsert. A retried or overlapping run cannot write twice.
+- **Spend limits:** `MAX_LLM_ITEMS_PER_RUN` and `DAILY_LLM_BUDGET_USD` (sum of today's `pipeline_runs.cost_usd_estimate`, persisted after every page). When either triggers, unclassified items stay `new` and `pipeline_runs.stop_reason` says why (for Admin in Phase 8).
+- **Reprocess:** `python -m app.pipeline --reprocess-outdated` resets items whose annotation has another `prompt_version` to `new`. The Admin button that calls it is Phase 8.
+- **Changes plan:** minor (`dc_specific` field in sources.yaml).
+
+## D-028 (2026-11-09): Prompt v2 after the first evaluation
+- **Context:** eval run 1 (`classify-v1`) had precision 15/15 and recall 15/20. All five misses were Hacker News title-only items with relevance 85–92 and quality 30–35, cut by the quality gate (40). The v1 prompt said only "a title-only item cannot score above 60", which the model read as "score title-only items low". Most HN items are title-only, so v1 would have rejected most real HN news.
+- **Decision:** `classify-v2` rates title-only items by how specific the headline is (concrete factual headline 45–60, vague or clickbait below 40, never above 60). Run 2: precision 20/22, recall 20/20.
+- **Caveat:** the same 40 items informed the change and measured it. There is no held-out set, so run 2 is optimistic. Both runs are recorded in AI_EVALUATION.md.
+- **Changes plan:** no.
