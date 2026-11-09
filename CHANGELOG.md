@@ -4,6 +4,25 @@ All notable changes, grouped by build phase. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 5: Recommendation engine (2026-11-09)
+
+#### Added
+- `backend/app/recommend/scoring.py`: the trending, most relevant, related, freshness and For You formulas. Each is written once and used both in Python and as SQL expressions.
+- `backend/app/recommend/foryou.py`: the For You ranking. It takes the anonymous profile, scores items on category, tag and embedding affinity plus quality and freshness, and excludes read, bookmarked and dismissed items. About 20% of slots are "Discover: <category>" items. Every item has a "why am I seeing this" `reason`. An empty profile gets a cold-start fallback (Trending + Most relevant).
+- Endpoints: `GET /feeds/trending`, `POST /feeds/foryou` (`Profile` request schema with size limits and known slugs only; the response adds `kind`, `reason`, `score` and `cold_start`).
+- `sort=trending` and `sort=relevant` on `/items` and `/topics/{slug}`.
+- Request-body middleware: `Content-Length` is required (411) and bodies over 64 KiB are refused (413).
+- `docs/ARCHITECTURE.md` with every formula. `docs/API.md` covers the new feeds, sorts and the profile contract.
+- Tests: `tests/test_recommend.py` (15 unit tests: each formula, ordering, normalisation, discovery interleave, reasons, cold start), `tests/test_recommend_db.py` (9 tests against real Postgres, including the Phase 5 acceptance check), and 14 new `tests/test_api.py` cases (profile validation, body limits, new paths).
+
+#### Changed
+- `/feeds/relevant` now ranks by `(0.6·relevance + 0.4·quality) / (1 + age_days/30)` instead of `relevance × quality`.
+- `/items/{id}/related` uses `scoring.related` (same formula as before).
+
+#### Changed vs. plan (see docs/DECISIONS.md D-032)
+- Trending `coverage_count` also counts extra sources that found the same URL (§11.2 provenance), not only near-duplicates.
+- Client-side profile updates (event weights, daily decay, onboarding picker, reset) are frontend work in Phase 9B. Phase 5 delivers the server contract.
+
 ### Phase 4: Backend API (2026-11-09)
 
 #### Added

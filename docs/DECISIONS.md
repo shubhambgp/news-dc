@@ -201,3 +201,23 @@ Each entry: context, options, decision, why, trade-offs, and whether it changes 
 - **Request bodies:** no Phase 4 endpoint accepts one. The body-size limit is added with the first POST endpoint (`/feeds/foryou`, Phase 5).
 - **Headers:** `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and `CSP default-src 'none'; frame-ancestors 'none'` on API responses. The Swagger UI page is exempt from the CSP, because it loads a CDN script. The frontend's CSP belongs to Caddy (Phase 10).
 - **Changes plan:** no.
+
+## D-032 (2026-11-09): Phase 5 recommendation choices
+- **One formula, two runtimes:** each score in `app/recommend/scoring.py` is a plain function. It runs on numbers in Python and, through SQLAlchemy operators (`**` renders as `power()`), on columns in SQL. Paginated feeds (`trending`, `relevant`) sort in SQL. For You ranks in Python. A DB test checks that the SQL ordering matches the Python formula.
+- **Coverage:** `coverage_count` = near-duplicates pointing at the item + (number of `item_sources` rows − 1). The plan counts only near-duplicates. §11.2 later made exact-URL duplicates attach as extra sources instead of new items, so they are the same "covered by many outlets" signal.
+- **"Mild recency decay"** for Most relevant: `÷ (1 + age_days/30)`. A month-old item keeps half its score.
+- **New sort modes:** `trending` and `relevant` on `/items` and `/topics/{slug}` ("topic-based = category filter + one of the sort modes"). `/feeds/relevant` now uses the Phase 5 formula, as D-031 announced. `sort=relevance` stays plain `relevance_score`.
+- **For You details the plan leaves open:**
+  - Bookmarked items are excluded like read ones.
+  - An onboarding topic adds +5 to that category's weight.
+  - Weights are normalised by the largest absolute weight.
+  - An affinity is the item's strongest category (or tag) weight.
+  - The taste embedding is the average embedding of the last 50 reads and the last 50 bookmarks.
+  - Discovery needs quality ≥ 60, rotates through categories, and fills every 5th slot.
+  - "Engaged" includes disliked categories, so a disliked category is never offered as discovery.
+  - Cold start means no positive signal, and the feed alternates Trending and Most relevant.
+- **Candidate pool:** the newest 1,000 public items, ranked in Python per request (52 ms live). `total` is at most 1,000. Marked `ponytail:` in the code with the upgrade path (score in SQL).
+- **Profile validation:** the size limits in docs/API.md and existing category slugs only (422 names the unknown slug). Unknown fields are rejected. The first request body arrived with this phase, so the 64 KiB body limit (413) and a required `Content-Length` (411) were added as D-031 announced.
+- **Client-side profile logic** (event weights, ×0.95 daily decay, onboarding picker, reset button, tooltip UI) belongs to the frontend (Phase 9B). Phase 5 defines and documents the contract the server accepts.
+- **Changes plan:** minor (coverage definition), recorded here and in the CHANGELOG.
+

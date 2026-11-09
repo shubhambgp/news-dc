@@ -429,3 +429,40 @@ Notes: the first search call (0.46 s) includes loading the embedding model. Late
 ### Not run
 - `docker compose up --build` (no Docker, RISKS R-001). Compose now mounts the `models` volume on the backend too. This is untested under Docker.
 - CI on GitHub (not pushed).
+
+## Phase 5 (2026-11-09)
+
+Environment: same machine and the same throwaway PostgreSQL 18.6 + pgvector 0.8.1 cluster as Phase 4 (port 55433). `newsdc` holds the live data (2,609 processed items), and `newsdc_test` is for pytest. No Docker. No LLM calls in this phase. No migration.
+
+### Automated checks (final state)
+| Command | Result |
+|---|---|
+| `uv lock --check` | `Resolved 111 packages` (no dependency changes) |
+| `uv run ruff format --check .` | `58 files already formatted` |
+| `uv run ruff check .` | `All checks passed!` |
+| `uv run mypy app` | `Success: no issues found in 36 source files` |
+| `TEST_DATABASE_URL=...newsdc_test uv run pytest -q` | `288 passed` (new: 15 in `test_recommend.py`, 9 in `test_recommend_db.py`, 14 in `test_api.py`; the Phase 4 relevant-feed test moved to `test_recommend_db.py`) |
+| `uv run pytest -q` (no DB) | `196 passed, 92 skipped` |
+
+**Phase 5 acceptance check:** `test_recommend_db.py::test_cooling_heavy_profile_returns_mostly_cooling_plus_discovery_and_excludes_read` passed. It sends a profile heavy in cooling (3 read, 1 dismissed). The first 10 items are 8 cooling and 2 discovery (slots 5 and 10, from networking and regulation). No read or dismissed ID appears anywhere in the full feed. The pure-ranking version, `test_recommend.py::test_cooling_heavy_profile_gets_mostly_cooling_plus_discovery`, also passed.
+
+Failures along the way (all fixed):
+- `test_api.py`: `/items?sort=trending` expected 422. That was correct for Phase 4 and is now a valid sort, so the case became `sort=hot`.
+- mypy: `dict[str | None, int]` from the read-count query. Fixed by dropping `NULL` categories.
+- `test_recommend.py`: a negative-weight test assumed a quality-70 networking item would rank in the main feed. It qualifies for discovery (a test bug), so it was lowered to quality 50.
+- `test_recommend_db.py`: `ValueError: expected list or ndarray`. pgvector's `avg(embedding)` came back as a string because `func.avg` had no result type, and binding it to `<=>` failed. **Fix:** `func.avg(..., type_=Vector(384))`.
+- `test_recommend_db.py`: expected security as the second discovery category, but the regulation fixture (quality 85) correctly outranks it (a test bug).
+- `SADeprecationWarning` for `Result.tuples()` (SQLAlchemy 2.1). Replaced it.
+
+### Live smoke test (uvicorn on :8011 against the live DB, final code)
+- `GET /feeds/trending?page_size=5`: total 2609. Top: `Nvidia's China Problem [pdf]` (HN, 16 points, 3 comments), then fresh items from today (`Data Center Energy Use and Grid Impacts`, FT, DCD).
+- `GET /feeds/relevant?page_size=5`: `Anthropic signs $3.4bn gas generator deal…` (r92 q68, today), `We Visited China's Stargate in Inner Mongolia` (r95 q70, 2 days), `Your data center may be halfway to waterless` (r92 q62), `Google has acquired Crusoe's data center site…` (r95 q72, 3 days).
+- `GET /topics/cooling?sort=trending&page_size=3`: 200.
+- `POST /feeds/foryou?page_size=10` with `{"categoryWeights":{"cooling":12,"sustainability":2},"readIds":[6,3752,32,3760]}` (the 4 newest cooling items): `200 0.051848s`, `cold=false total=1000`. 8 personal items, all with cooling among their categories and the reason `Because you read 4 Cooling articles`. Slots 5 and 10 are `Discover: Power & Energy` and `Discover: AI / Agentic AI`.
+- Same profile with `page_size=50`: the intersection of returned IDs with `readIds` is `[]`.
+- `POST /feeds/foryou` with `{}`: `0.025159s`, `cold=true`, alternating `Trending now` / `Highly relevant`.
+- Unknown slug: `{"error":{"code":"validation_error","message":"body: unknown category nope",...}}`.
+- 70,000-byte body: `{"error":{"code":"payload_too_large","message":"request body over 65536 bytes",...}}`.
+
+Not run: `docker compose` (no Docker, R-001). CI on GitHub (not pushed).
+

@@ -2,7 +2,7 @@
 
 Base path: `/api/v1`. The interactive OpenAPI docs are at `/api/v1/docs` and the schema is at `/api/v1/openapi.json`. Request and response models live in `backend/app/schemas.py`.
 
-Every endpoint below is **public**, read-only (`GET`), takes no request body, and is **rate limited** to `RATE_LIMIT_DEFAULT` (60/minute) per client IP. `/health` and `/ready` are the exceptions: they aren't rate limited. Admin endpoints arrive in Phase 8.
+Every endpoint below is **public** and read-only, and is **rate limited** to `RATE_LIMIT_DEFAULT` (60/minute) per client IP. `/health` and `/ready` are the exceptions: they aren't rate limited. `POST /feeds/foryou` is the only endpoint that takes a request body. Admin endpoints arrive in Phase 8.
 
 ## Conventions
 
@@ -17,7 +17,7 @@ Every endpoint below is **public**, read-only (`GET`), takes no request body, an
 
 ### Shared item filters
 
-`/items`, `/feeds/relevant`, `/topics/{slug}` and `/search` accept these filters:
+`/items`, `/feeds/trending`, `/feeds/relevant`, `/topics/{slug}` and `/search` accept these filters:
 
 | Param | Type | Meaning |
 |---|---|---|
@@ -36,13 +36,53 @@ A well-formed slug or key that doesn't exist returns an empty list. A malformed 
 |---|---|---|---|
 | `GET /health` | Liveness. Always 200 and reports the DB state. | | |
 | `GET /ready` | Readiness. Returns 503 while the DB is down. | | |
-| `GET /items` | Processed items with filters | `sort=latest` (default) \| `relevance` \| `quality` (`trending` arrives in Phase 5) | 422 |
+| `GET /items` | Processed items with filters | `sort=latest` (default) \| `relevance` \| `quality` \| `trending` \| `relevant` (see below) | 422 |
 | `GET /items/{id}` | Detail: the annotation (`key_insights`, `entities`), `related_links`, `coverage` (every source that found the item, with its URL, engagement and timestamps) and `also_covered_by` (near-duplicates with their similarity) | | 404, 422 |
 | `GET /items/{id}/related` | Up to 6 items: cosine similarity of the embeddings + 0.1 per shared category. Each has `similarity` and `score`. Returns `[]` when the item has no embedding yet. | `score DESC` | 404, 422 |
-| `GET /feeds/relevant` | Most relevant items | `relevance_score × quality_score DESC` (Phase 5 refines this) | 422 |
+| `GET /feeds/trending` | Trending items | `sort=trending` | 422 |
+| `GET /feeds/relevant` | Most relevant items | `sort=relevant` | 422 |
+| `POST /feeds/foryou` | Personalised feed from the anonymous localStorage profile (see below). Takes `page`/`page_size`. | profile score, every 5th item `discover` | 411, 413, 422 |
 | `GET /topics` | Enabled categories in display order, each with `item_count` and its 3 newest items (`latest`) | `sort_order` | |
 | `GET /topics/{slug}` | `{slug, name, description, items: Page}` for one enabled category | same `sort` as `/items` | 404 (unknown or disabled), 422 |
 | `GET /search?q=` | Hybrid search (see below). The response adds `mode` (`hybrid` or `keyword`) and, per hit, `snippet` and `score`. | RRF score DESC | 422 |
+
+### Sorts and feeds (Phase 5)
+
+The formulas are explained in `docs/ARCHITECTURE.md`. Ties are broken by `published_at DESC, id DESC`.
+
+| `sort` | Score |
+|---|---|
+| `latest` | `published_at DESC` |
+| `relevance` | `relevance_score DESC` |
+| `quality` | `quality_score DESC` |
+| `trending` | `(1 + points + 2·comments + quality/10 + 5·coverage) / (age_hours + 2)^1.5`, where coverage is near-duplicates plus extra sources |
+| `relevant` | `(0.6·relevance + 0.4·quality) / (1 + age_days/30)` |
+
+### For You
+
+`POST /feeds/foryou?page=1&page_size=20` with `Content-Type: application/json`:
+
+```json
+{"categoryWeights": {"cooling": 7.5}, "tagWeights": {"immersion": 3},
+ "readIds": [12, 40], "bookmarkIds": [7], "dismissedIds": [99], "explicitTopics": ["cooling"]}
+```
+
+| Field | Limit |
+|---|---|
+| `categoryWeights` | ≤ 64 entries. Keys must be existing category slugs. Values are finite, −1000 to 1000. |
+| `tagWeights` | ≤ 200 entries. Tags are 1–64 characters and are compared case-insensitively. |
+| `readIds` | ≤ 200 item IDs, oldest first |
+| `bookmarkIds`, `dismissedIds` | ≤ 500 item IDs each |
+| `explicitTopics` | ≤ 64 category slugs (picked at onboarding) |
+
+Every field is optional, and an unknown field returns 422. The body must have a `Content-Length` (otherwise 411) and be at most 64 KiB (otherwise 413).
+
+The response is a page (`items`, `page`, `page_size`, `total`, `has_more`) plus `cold_start`. Each item adds:
+- `kind`: `personal`, `discover`, `trending` or `relevant`
+- `reason`: the "Why am I seeing this?" text, e.g. `Because you read 4 Cooling articles` or `Discover: Networking`
+- `score`
+
+Read, bookmarked and dismissed items are never returned. The feed ranks the newest 1,000 public items, so `total` is at most 1,000. A profile with no positive signal returns Trending + Most relevant with `cold_start: true`.
 
 ### Search
 
@@ -64,6 +104,8 @@ Every non-2xx response has the same shape:
 | Status | `code` | When |
 |---|---|---|
 | 404 | `not_found` | Unknown route, item or topic |
+| 411 | `length_required` | A request body without `Content-Length` |
+| 413 | `payload_too_large` | A request body over 64 KiB |
 | 405 | `method_not_allowed` | Wrong HTTP method |
 | 422 | `validation_error` | Invalid parameters. The message names the field (up to 3 errors), e.g. `query.page_size: Input should be less than or equal to 50` |
 | 429 | `rate_limited` | Over the per-IP limit |

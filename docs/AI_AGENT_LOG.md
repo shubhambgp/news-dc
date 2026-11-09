@@ -96,3 +96,18 @@ Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
 | Docs: API.md, DECISIONS D-029 to D-031, RISKS R-017, CHANGELOG, CLAUDE.md | Agent | Pending human review |
 | Try the API (e.g. `/api/v1/docs`, a search, an article detail) | Human | **Pending human verification** |
 
+## Phase 5: Recommendation engine
+
+Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
+
+| Task | Done by | How it was verified |
+|---|---|---|
+| Re-read Phase 5, §11.7, §11.12, §12, §13; inspected the Phase 4 API code and the live DB | Agent | n/a |
+| Scoring formulas (`app/recommend/scoring.py`): trending, relevant, related, freshness, For You | Agent | 15 unit tests (`test_recommend.py`); SQL-vs-Python ordering test against Postgres. Pending human verification |
+| `/feeds/trending`, `sort=trending|relevant` on `/items` and `/topics/{slug}`, new `/feeds/relevant` formula | Agent | `test_recommend_db.py` (ordering, coverage, pagination without repeats); live smoke test on 2,609 items. Pending human verification |
+| `POST /feeds/foryou`: profile validation, discovery, reasons, cold start, exclusions | Agent | **Acceptance test** `test_cooling_heavy_profile_returns_mostly_cooling_plus_discovery_and_excludes_read` (8/10 cooling, 2 discovery, read/dismissed absent) plus a pure-ranking version; live request on real data. Pending human verification |
+| Request body limits (411/413) | Agent | `test_request_body_size_limits`; live 413 check |
+| Found and fixed: pgvector `avg()` returned a string (no result type) | Agent | Found by a failing DB test; fixed by typing `func.avg` as `Vector` |
+| Docs: ARCHITECTURE.md, API.md, DECISIONS D-032, CHANGELOG, CLAUDE.md | Agent | Pending human review |
+| Try the feeds (e.g. POST a profile to `/api/v1/feeds/foryou` in `/api/v1/docs`) and check the reasons make sense | Human | **Pending human verification** |
+
