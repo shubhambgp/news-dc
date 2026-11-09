@@ -1,0 +1,40 @@
+# Ingestion sources (PLAN §11.6). Seeded into the `sources` table on backend startup (upsert by key).
+# This file is administrator-controlled and is the source of truth for every field, including `enabled`.
+#
+# Every source is disabled until Phase 2 checks its endpoint, terms and robots policy and records them
+# in docs/SOURCE_REGISTER.md. The loader refuses `enabled: true` without a `terms_url`.
+# RSS feeds are added in Phase 2, once each feed URL has been verified to work.
+sources:
+  - key: hn
+    name: Hacker News (Algolia API)
+    type: hackernews
+    endpoint_or_feed_url: https://hn.algolia.com/api/v1/search_by_date
+    enabled: false
+    terms_url: null
+    robots_policy: unverified
+    allowed_fields: [title, url, author, created_at, points, num_comments, story_id]
+    max_requests_per_minute: 30
+    backfill_window_days: 365
+    attribution_label: Hacker News
+  - key: arxiv
+    name: arXiv API
+    type: arxiv
+    endpoint_or_feed_url: https://export.arxiv.org/api/query
+    enabled: false
+    terms_url: null
+    robots_policy: unverified
+    allowed_fields: [title, summary, authors, published, id, categories, pdf_link]
+    max_requests_per_minute: 20  # plan: at least 3 s between calls
+    backfill_window_days: 365
+    attribution_label: arXiv
+  - key: github
+    name: GitHub repository search
+    type: github
+    endpoint_or_feed_url: https://api.github.com/search/repositories
+    enabled: false
+    terms_url: null
+    robots_policy: unverified
+    allowed_fields: [full_name, html_url, description, topics, stargazers_count, pushed_at, owner]
+    max_requests_per_minute: 10
+    backfill_window_days: 365
+    attribution_label: GitHub

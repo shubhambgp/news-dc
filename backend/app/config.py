@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -21,6 +22,8 @@ class Settings(BaseSettings):
     max_llm_items_per_run: int = 300
     github_token: str = ""
     log_level: str = "INFO"
+    # Repo-root config/ (categories.yaml, sources.yaml). In the container this resolves to /config.
+    config_dir: Path = Path(__file__).resolve().parents[2] / "config"
 
     @property
     def cors_origin_list(self) -> list[str]:

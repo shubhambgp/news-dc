@@ -1,0 +1,61 @@
+# The 14 NewsDC categories (PLAN §6).
+# `description` is shown to the LLM classifier; `keywords` feed the cheap pre-filter (Phase 3).
+# Seeded into the `categories` table on backend startup (upsert by slug).
+# On re-seed, `enabled` is NOT overwritten: it is owned by Admin once the row exists.
+categories:
+  - slug: dc-infrastructure
+    name: Data Center Infrastructure
+    description: Data center buildings, campuses, racks, construction, colocation and facility operations.
+    keywords: [data center, datacenter, data centre, colocation, colo, hyperscale, rack, campus, white space, megawatt campus, server farm]
+  - slug: ai-compute-gpus
+    name: AI Compute & GPUs
+    description: GPUs and AI accelerators (NVIDIA, AMD, custom silicon), AI training/inference clusters, HBM and servers.
+    keywords: [gpu, nvidia, amd instinct, accelerator, tpu, trainium, h100, h200, b200, blackwell, hbm, ai cluster, supercomputer]
+  - slug: power-energy
+    name: Power & Energy
+    description: Grid capacity, power purchase agreements, nuclear and SMRs, gas turbines, batteries and power availability for data centers.
+    keywords: [power grid, grid, ppa, power purchase agreement, nuclear, smr, small modular reactor, gas turbine, utility, substation, megawatt, gigawatt, battery storage]
+  - slug: cooling
+    name: Cooling
+    description: Data center cooling, including liquid, immersion and direct-to-chip cooling, chillers and heat reuse.
+    keywords: [cooling, liquid cooling, immersion cooling, direct-to-chip, cold plate, chiller, cdu, heat reuse, rear door heat exchanger]
+  - slug: sustainability
+    name: Sustainability
+    description: PUE, WUE, carbon emissions, renewable energy, water use and environmental impact of data centers.
+    keywords: [pue, wue, carbon, emissions, net zero, renewable, sustainability, water usage, solar, wind, green data center]
+  - slug: hyperscaler-investments
+    name: Hyperscaler Investments
+    description: Capital spending and new campuses by AWS, Microsoft Azure, Google Cloud, Meta, Oracle and other hyperscalers.
+    keywords: [hyperscaler, aws, amazon web services, azure, microsoft, google cloud, meta, oracle, capex, new campus, investment]
+  - slug: economics-finance
+    name: Economics & Financial Models
+    description: TCO, data center REITs, financing, M&A, leasing, pricing and market economics.
+    keywords: [tco, reit, financing, acquisition, merger, lease, pricing, valuation, private equity, debt, market report]
+  - slug: site-selection
+    name: Site Selection
+    description: Where data centers are built, including land, permitting, zoning, tax incentives and local opposition.
+    keywords: [site selection, land, permitting, zoning, tax incentive, tax break, rezoning, county, local opposition, location]
+  - slug: networking
+    name: Networking
+    description: Data center networking, including optical, InfiniBand, Ethernet, interconnects and subsea cables.
+    keywords: [networking, optical, infiniband, ethernet, interconnect, subsea cable, fiber, switch, transceiver, nvlink, co-packaged optics]
+  - slug: optimization
+    name: Optimization
+    description: Utilization, workload scheduling, energy efficiency and DCIM software for data center operations.
+    keywords: [utilization, scheduling, efficiency, dcim, workload placement, capacity planning, power capping, optimization]
+  - slug: ai-agentic
+    name: AI / Agentic AI
+    description: AI for data center operations, AI agents, and model-serving and inference infrastructure.
+    keywords: [ai ops, aiops, agentic, ai agent, inference, model serving, llm infrastructure, ai factory]
+  - slug: security
+    name: Security
+    description: Physical security, cybersecurity and compliance of data centers.
+    keywords: [security, cybersecurity, physical security, compliance, ransomware, outage, breach, soc 2, iso 27001]
+  - slug: regulation
+    name: Regulation
+    description: Policy, moratoriums, energy rules, data sovereignty and government regulation affecting data centers.
+    keywords: [regulation, policy, moratorium, legislation, data sovereignty, ferc, eu ai act, energy efficiency directive, government]
+  - slug: emerging-tech
+    name: Emerging Technologies
+    description: Quantum computing, photonics, space and undersea data centers, chiplets and other emerging technology.
+    keywords: [quantum, photonics, silicon photonics, space data center, undersea data center, chiplet, neuromorphic, edge data center]

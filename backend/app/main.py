@@ -1,12 +1,19 @@
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Literal
 
 from fastapi import APIRouter, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy.exc import SQLAlchemyError
 
 from app import __version__, db
 from app.config import get_settings
 from app.logging import setup_logging
+from app.seed import seed
+
+log = logging.getLogger("app.main")
 
 router = APIRouter(prefix="/api/v1")
 
@@ -35,6 +42,17 @@ def ready(response: Response) -> Health:
     return h
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Invalid YAML raises and stops startup on purpose. A DB that is down or not yet migrated
+    # only logs: liveness stays up and /ready reports the DB state.
+    try:
+        seed(db.engine, get_settings().config_dir)
+    except SQLAlchemyError as exc:
+        log.error("seeding skipped: database error", extra={"error": type(exc).__name__})
+    yield
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     setup_logging(settings.log_level)
@@ -44,6 +62,7 @@ def create_app() -> FastAPI:
         docs_url="/api/v1/docs",
         openapi_url="/api/v1/openapi.json",
         redoc_url=None,
+        lifespan=lifespan,
     )
     app.add_middleware(
         CORSMiddleware,
