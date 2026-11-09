@@ -128,3 +128,18 @@ Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
 | Docs: API.md, ARCHITECTURE.md, AI_CONFIG.md, DECISIONS D-033, RISKS R-005, CHANGELOG, CLAUDE.md, `.env.example` | Agent | Pending human review |
 | Read the Q&A pairs in VERIFICATION_LOG and judge answer quality and faithfulness to the cited sources | Human | **Pending human verification** |
 
+
+
+## Phase 7: Emerging trends and dashboard data
+
+| Task | Done by | How verified |
+|---|---|---|
+| Re-read Phase 7, §5 (`trend_briefs`, `pipeline_runs`), §11.5, §11.8, §12, §13; inspected the jobs, worker, LLM, assistant and API code | Agent | n/a |
+| Rising topics (share-based change, ≥3 items, publisher filter) | Agent | `test_trends.py`; live `/trends` on 2,609 items. Pending human verification |
+| Prompt `trend-brief-v1`, `generate_brief`, citation filtering, storage with model/tokens/cost | Agent | `test_trends.py`, `test_trends_db.py`; one live brief (30 sources, 20 cited, 0 removed). Pending human verification |
+| Migration 0004 (job kind, brief columns, index) | Agent | Fresh-migration and model/migration match tests; downgrade/upgrade round trip |
+| Weekly schedule + `trend_brief` job handler | Agent | Cron next-run check; live run through `jobs.enqueue` → `claim` → `run_job` |
+| `GET /trends`, `GET /stats` | Agent | `test_trends_db.py`; live responses cross-checked against SQL counts |
+| Found and fixed: publishers listed as rising companies | Agent | Live `/trends`; unit test; D-034 |
+| Docs: API.md, ARCHITECTURE.md, AI_CONFIG.md, DECISIONS D-034, CHANGELOG, CLAUDE.md | Agent | Pending human review |
+| Read the live brief in VERIFICATION_LOG and judge whether it is faithful to its cited sources and useful | Human | **Pending human verification** |

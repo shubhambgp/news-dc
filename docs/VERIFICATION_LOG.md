@@ -698,3 +698,110 @@ Logged per answer (`ask answered` lines in the uvicorn log, in order: the five a
 - An off-topic question still costs one LLM call (about $0.025) because OR-ed keywords match common words. A minimum-evidence threshold would save it.
 
 Not run: `docker compose` (no Docker, R-001). CI on GitHub (not pushed). Pricing for Opus 5.5 ($4/$20 per MTok) was **not** re-checked on the live pricing page.
+
+
+## Phase 7 (2026-11-09)
+
+Environment: same machine and PostgreSQL 18.6 + pgvector 0.8.1 cluster (port 55433). `newsdc` holds the live data (3,898 items, 2,609 processed); `newsdc_test` is the throwaway pytest database. No Docker. **uv is not on PATH in this session**, so the commands below ran with the project's existing `backend/.venv` binaries (`.venv/bin/ruff`, `.venv/bin/mypy`, `.venv/bin/pytest`, `.venv/bin/alembic`), which is what `uv run` would execute; no dependency changes. One real, paid call to `claude-opus-5-5` (the live brief, $0.063). Tests never call the API (`FakeChat`, autouse `no_real_llm`).
+
+Plan Phase 7 lists no separate acceptance block. The checks used are its three scope items: (1) rising topics with % change, (2) a scheduled weekly brief with citations stored in `trend_briefs`, (3) `/stats` with every listed field.
+
+### Automated checks (final state)
+| Command | Result |
+|---|---|
+| `ruff format --check .` | `69 files already formatted` |
+| `ruff check .` | `All checks passed!` |
+| `mypy app` | `Success: no issues found in 40 source files` |
+| `TEST_DATABASE_URL=...newsdc_test pytest -q` | `344 passed` (new: 12 in `test_trends.py`, 8 in `test_trends_db.py`) |
+| `pytest -q` (no DB) | `239 passed, 105 skipped` |
+| `alembic downgrade 0003` then `upgrade head` on `newsdc_test` | `Running downgrade 0004 -> 0003`, `Running upgrade 0003 -> 0004` |
+| `alembic upgrade head` on `newsdc` | `Running upgrade 0003 -> 0004` |
+
+What the new tests cover: share-based change (more items overall is not a rise), new terms, the ≥3 minimum, window bounds, case-insensitive counting once per item, ordering and limit, no baseline; publishers dropped from their own items' companies; untrusted terms escaped in the prompt; prompt hash pinned to `trend-brief-v1`; brief stored with only valid citations, this week's processed items only, cost computed; no LLM call with <5 items; no-citation and `max_tokens` answers rejected and not stored; `trend_brief` job kind accepted by the DB; `/trends` numbers (6/10 vs 2/20 = +500%, falling terms absent, brief sources numbered 1–10); `/stats` funnel, category counts and average quality, content types, sources, 60 zero-filled days, runs, cost.
+
+Failures along the way (all fixed):
+- `test_openapi_lists_every_endpoint_and_error_shape`: `/trends` and `/stats` added to the pinned path list.
+- Two of my own unit-test expectations were wrong (a spelling tie, and a window test with no baseline items); the tests were corrected, not the code.
+- SQLAlchemy 2.1 deprecation warning for `Result.tuples()`; removed.
+- **Live finding:** the first `/trends` on real data listed publishers as rising companies (DatacenterDynamics +4,113%, The New York Times, Financial Times, ServeTheHome) because the classifier lists the outlet as an entity. Fixed by ignoring a company equal to the item's own publisher (D-034); covered by a unit test.
+
+### Live checks (uvicorn on :8012 against `newsdc`, final code)
+
+**1. Rising topics** (`GET /trends` at 2026-11-09T16:28Z; term (recent/baseline items, change)):
+- tags: export-controls (7/1, +1447%), data-center-protest (4/0, +784%), data-center-monitoring (3/0, +563%), optical-networking (3/1, +563%), ups-monitoring (3/0, +563%), ai-agents (3/2, +232%), ai-data-center-power (3/2, +232%), battery-energy-storage (3/2, +232%), predictive-maintenance (3/2, +232%), nvidia (17/14, +168%)
+- companies: Megaspeed International Pte Ltd (3/0, +563%), OpenAI (4/2, +342%), Intel (3/2, +232%), Microsoft (12/9, +195%), Anthropic (7/6, +158%), AMD (5/7, +58%), Nvidia (32/66, +7%)
+- technologies: battery energy storage system (3/1, +563%), AI (5/2, +453%), AI agents (5/3, +268%), Three.js (3/2, +232%), liquid cooling (4/5, +77%), AI accelerators (3/4, +66%), UPS (3/4, +66%), vLLM (3/4, +66%)
+
+**2. Weekly brief.** Scheduler: `add_job(schedule_brief, "cron", day_of_week="mon", hour=6)` → `next brief run 2026-11-16 06:00:00+00:00`. On-demand run through the real job path: `python -m app.jobs enqueue trend_brief` → `{"queued": 3}`, then `jobs.claim` + `worker.run_job`:
+
+```
+"message": "trend brief stored", "brief_id": 1, "model": "claude-opus-5-5", "prompt_version": "trend-brief-v1", "sources": 30, "cited": 20, "removed_citations": 0, "tokens_in": 10152, "tokens_out": 1069, "cost_usd": "0.062733"
+"message": "job finished", "job_id": 3, "kind": "trend_brief", "attempt": 1, "outcome": "succeeded"
+```
+
+The brief as served by `GET /trends` (period 2026-11-02T16:28:10.784951Z to 2026-11-09T16:28:10.784951Z):
+
+> Power is this week's dominant theme: AI developers are securing their own on-site generation, and grid researchers are focusing on how large data centers behave on the network. Community opposition and new chip specifications also stand out.
+>
+> **AI labs securing their own power**
+> - Anthropic signed a $3.4bn deal to support 1.7 GW of data center power by taking over an existing OnePWR order of Caterpillar gas generator sets [1]. The FT describes this as bypassing traditional suppliers to secure scarce equipment [5].
+> - Google acquired Crusoe's southeast Wyoming site. Its hybrid power strategy combines fuel cells, grid power and natural gas turbines, with a planned carbon capture roadmap [4].
+> - SpaceXAI claims its planned Arizona data center will reach 6 GW, with construction possibly starting in March 2027 [24].
+>
+> **Grid integration and battery storage research**
+> - Several arXiv papers address how data centers behave on the grid. Topics include battery storage sizing to meet interconnection requirements [10], ride-through-aware voltage control that cut mean disconnection rates by 44.8% in one test system [12], and transmission planning under uncertainty about which projects get built [29].
+> - Battery dispatch using price and load forecasts reported 2.63 times the cost savings of a rule-based strategy [18].
+> - A county-level US study finds that growth in data center floor area drives nearby generation capacity, with the strongest effects in the West [13].
+>
+> **Community pushback and new commitments**
+> - Power shortages and local opposition are delaying projects [16]. A small Spanish town is contesting a macro data center [23].
+> - OpenAI published a National Community Compact. It commits to paying full electricity and infrastructure costs, writing a water plan for each campus that prioritizes closed-loop or low-water cooling, and limiting NDAs with public officials [11, 30].
+>
+> **Chips and server hardware**
+> - NVIDIA revised Rubin specifications as production ramps. HBM4 bandwidth drops from 22TB/s to 19.2TB/s and NVLink bandwidth from 3.6TB/s to 3.0TB/s, while scale-out bandwidth rises to 450GB/s [17].
+> - Google added TPU 8tx for confidential computing and TPU 8i Max for context scaling [22].
+> - An ASRock Rack Diamond Rapids board routes all PCIe Gen6/CXL 3.0 I/O through cables [20].
+>
+> **New designs and markets abroad**
+> - The Inner Mongolia campus SemiAnalysis calls "Stargate" is planned at 800MW, with 120MW built within a year. It pilots 800V DC power with solid-state transformers and uses cooling without central chillers [2].
+> - Argentina's Milei envisions an unregulated AI hub in Patagonia [28].
+>
+> **Governance and financial signals**
+> - Nvidia opened an investigation into Jensen Huang's relationship with an executive that U.S. officials linked to Chinese intelligence; the item connects the matter to Megaspeed International [26].
+> - ING Bank is reportedly seeking to sell about $500m in data center loans, including loans tied to a Stargate site, amid investor concern [25].
+
+Every cited number maps to a real source link (20 of 30 sources cited, check: `all map: True`):
+
+| n | Title | URL |
+|---|---|---|
+| [1] | Anthropic signs $3.4bn gas generator deal to support 1.7GW of data center power | https://www.datacenterdynamics.com/en/news/anthropic-signs-34bn-gas-generator-deal-to-support-17gw-of-data-center-power/ |
+| [2] | We Visited China’s Stargate in Inner Mongolia | https://newsletter.semianalysis.com/p/we-visited-chinas-stargate-in-inner |
+| [4] | Google has acquired Crusoe's data center site in southeast Wyoming | https://www.crusoe.ai/resources/newsroom/crusoe-wyoming-data-center-campus-update |
+| [5] | Anthropic strikes $3.4bn deal to generate gas-fired power for data centres | https://www.ft.com/content/41bf5c6a-9735-4f1a-a8e3-2bcccad58ba0?syn-25a6b1a6=1 |
+| [10] | Supporting Data Center Grid Integration via Co-Optimized Battery Energy Storage Sizing and Capacity Allocation | https://arxiv.org/abs/2611.09001 |
+| [11] | Setting a new standard for responsible AI infrastructure | https://openai.com/index/setting-new-standard-responsible-ai-infrastructure/ |
+| [12] | Reducing Data-Center Load Transfers with Ride-Through-Aware Voltage Control | https://arxiv.org/abs/2611.08777 |
+| [13] | Data Center Agglomeration and Power Infrastructure Capacity in the United States | https://arxiv.org/abs/2611.06737 |
+| [16] | AI’s Expansion Hits the Limits of Local Power | https://www.datacenterknowledge.com/energy-power-supply/ai-s-expansion-hits-the-limits-of-local-power |
+| [17] | Nvidia Updates Rubin GPU Specs as First Production Hardware Arrives | https://www.servethehome.com/nvidia-updates-rubin-gpu-specs-as-first-production-hardware-arrives/ |
+| [18] | Joint Electricity Price and Load Forecasting for Data Center Battery Dispatch Using Polynomial Diffusion Models | https://arxiv.org/abs/2611.08470 |
+| [20] | ASRock Rack DMRD16-2L+ Spotted with 16 DDR5 Slots for Diamond Rapids | https://www.servethehome.com/asrock-rack-dmrd16-2l-plus-diamond-rapids-ocp-summit-2026/ |
+| [22] | Google expands eighth-generation TPU portfolio with two new “TPU systems” | https://www.datacenterdynamics.com/en/news/google-expands-eighth-generation-tpu-portfolio-with-two-new-tpu-systems/ |
+| [23] | A small town in Spain battles again construction of a macro data center | https://english.elpais.com/spain/2026-11-07/a-small-town-in-spain-battles-again-construction-of-a-macro-data-center-its-a-way-of-kicking-us-out.html |
+| [24] | SpaceXAI plans data center in Arizona, Musk's firm claims it will have 6GW capacity | https://www.datacenterdynamics.com/en/news/spacexai-data-center-arizona-cochise-county-elon-musk/ |
+| [25] | ING Bank looks to sell $500m in data center loans at once, including at Stargate site | https://www.datacenterdynamics.com/en/news/ing-bank-looks-to-sell-500m-in-data-center-loans-at-once-including-at-stargate-site/ |
+| [26] | Nvidia Opens Investigation Into Jensen Huang’s Relationship With Chinese Spy | https://www.nytimes.com/2026/11/08/technology/nvidia-investigation-jensen-huang-china.html |
+| [28] | Argentina’s Milei dreams of data centres on the Patagonian steppe | https://www.ft.com/content/d432ae29-6454-4916-98c7-afb6993cfb67?syn-25a6b1a6=1 |
+| [29] | Transmission Expansion with Large, Discrete Data Center Realization Uncertainty | https://arxiv.org/abs/2611.05958 |
+| [30] | OpenAI Pledges to Give Locals More Say in Data Center Projects | https://www.nytimes.com/2026/11/05/technology/openai-data-centers-midterms.html |
+
+**3. `GET /stats`**: `HTTP 200 0.080s`.
+- funnel `{fetched: 3898, new: 0, rejected_prefilter: 52, rejected_ai: 1158, duplicate: 79, failed: 0, processed: 2609}`; matches `SELECT status, count(*) FROM items GROUP BY 1`.
+- by_category sums to 2,609 (ai-compute-gpus 640 at avg quality 56.3 … security 45 at 56.1; power-energy has the highest average, 68.7).
+- by_content_type: news 1,033, engineering 709, research 573, investment 294 (sum 2,609).
+- by_source: hn 2,487 found / 1,506 processed, github 760/545, arxiv 502/464, dck 50/48, dcd 27/20, ft_tech 26/6, nyt_tech 26/7, semianalysis 20/13, sth 6/5, nextplatform 0/0, register_dc 0/0.
+- per_day: 60 days, 644 processed items, last three days 11, 12, 22.
+- pipeline_runs: the 10 latest (run 40 pipeline, runs 39–31 ingest).
+- ai_cost after the brief: `{classifier_usd: 1.1292, classifier_today_usd: 1.1292, trend_brief_usd: 0.0627, total_usd: 1.1919}`.
+
+Not run: `docker compose` (no Docker, R-001). CI on GitHub (not pushed).

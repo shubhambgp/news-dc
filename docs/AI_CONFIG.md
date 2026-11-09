@@ -125,3 +125,11 @@ Logs never include API keys, the system prompt or article bodies, only item IDs,
 Seven live questions on 2026-11-09 (the 5 examples, a follow-up and an off-topic one; uvicorn log; $0.193 in total): 3,375–4,151 input tokens, 571–961 output tokens, 5.7–9.5 s, **$0.024–$0.036 per answer** at the prices above. 1,000 questions a day would be about $30.
 
 Ask NewsDC has no daily spend cap yet. The per-IP rate limit and the max-tokens cap bound it. A global daily cap belongs with the Admin spend view in Phase 8 (D-033).
+
+## Trend brief (Phase 7)
+
+- **Model and settings:** the Ask NewsDC ones (`ASSISTANT_MODEL`, `ASSISTANT_EFFORT`, `ASSISTANT_MAX_TOKENS`, assistant prices). No separate setting: it is one call a week (D-034).
+- **Prompt:** `backend/app/prompts/trend_brief.md`, version `trend-brief-v1` (`PROMPT_VERSION` in `app/ai/trends.py`, pinned to the file's sha256 by a test). Same grounding, injection and citation rules as the assistant; 3–6 bold themes with bullets, 250–400 words.
+- **Schedule:** the worker enqueues a `trend_brief` job every Monday 06:00 UTC (only when `ANTHROPIC_API_KEY` and `ASSISTANT_MODEL` are set). On demand: `python -m app.jobs enqueue trend_brief`. Job retries follow the normal job lifecycle; an unusable answer (no citations, refusal, `max_tokens`) is a permanent failure.
+- **Stored per brief:** model, prompt version, input/output tokens, estimated cost. The log line adds the number of sources, cited and removed citations.
+- **Cost (measured):** first live brief on 2026-11-09: 10,152 input + 1,069 output tokens, 10 s, **$0.063** at $4/$20 per MTok. About $3 a year at one brief a week.

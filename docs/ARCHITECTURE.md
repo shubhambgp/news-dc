@@ -78,3 +78,17 @@ Code: `backend/app/api/ask.py` (retrieval, SSE endpoint), `backend/app/ai/assist
    `retrieval = 1 − position/25` in the RRF list (1.0 for the best hit). Raw RRF scores were tried first, but they sit too close together (rank 2 has 98% of rank 1's score), so freshness decided everything. `freshness` halves every 7 days (the For You function). Relevance and quality are the 0–100 AI scores divided by 100. Ties are broken by `id DESC`.
 4. **Evidence:** each source is `[n] title, publisher, date, url, summary (≤1,200 chars), key insights (≤5 × 300 chars)` inside `<source n="…">` tags with `<` and `>` escaped, so about 3,500–4,200 input tokens per question.
 5. **Answer:** streamed from `ASSISTANT_MODEL`. Text passes through `CitationFilter`, which drops citation numbers outside 1..8 (holding back an unfinished `[` so a marker split across chunks is checked whole).
+
+## Rising topics and trend brief (Phase 7)
+
+**Rising topics** (`app/ai/trends.py:rising`) over processed items, separately for tags, companies and technologies:
+
+- Windows: recent = the last 7 days, baseline = the 28 days before (by publication date, fetch time when missing).
+- A term is matched case-insensitively and counted once per item. It is shown in its most common spelling.
+- `share_recent = recent / items_recent`, `share_baseline = max(baseline, 1) / items_baseline`
+- `change_pct = round((share_recent / share_baseline − 1) × 100)`
+- Listed when `recent ≥ 3` and `change_pct > 0`, ordered by `change_pct`, then `recent`; top 10.
+
+Shares, not raw counts, because collection volume varies (RSS feeds only return recent items, so the last week always has more items). A term absent from the baseline counts as 1 baseline item, so it gets a finite change and ranks with the rest (`new: true`). For companies, the item's own publisher is dropped (the classifier often lists the outlet itself).
+
+**Trend brief** (`generate_brief`): the 30 processed items of the last 7 days with the highest *relevant* score (relevance and quality, mild age decay) become numbered `<source>` blocks (the same escaped format as Ask NewsDC), followed by the rising topics as a hint. `ASSISTANT_MODEL` writes 250–400 words of themes with `[n]` citations. Unknown numbers are removed; a brief without any valid citation, a refusal or a cut-off answer is not stored. `trend_briefs.sources` keeps the 30 ids in order, so `[n]` is `sources[n-1]`. Fewer than 5 items in the week: no brief and no LLM call.

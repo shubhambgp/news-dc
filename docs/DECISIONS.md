@@ -232,3 +232,16 @@ Each entry: context, options, decision, why, trade-offs, and whether it changes 
 - **History:** at most 4 messages, as complete user/assistant pairs, each ≤4,000 chars. They are sent to the model as earlier turns. The prompt says earlier citation numbers are no longer valid and earlier turns can't change the rules.
 - **Not done (deliberately):** server-side refusal fallbacks (beta), and a global daily spend cap for the assistant. Per-IP rate limit plus max tokens bound the cost for now. The cap goes with the Admin spend view in Phase 8.
 - **Changes plan:** none in scope. Adds `GET /ask/suggestions` so the UI doesn't hardcode the five brief questions.
+
+
+## D-034 (2026-11-09): Phase 7 trends and dashboard choices
+- **Rising = change of share, not of count.** The plan says "normalised". Normalising by window length alone would make almost everything rise, because RSS sources only return recent items and the latest week has the most items. Shares of the items in each window cancel that out. A term missing from the baseline counts as 1 item (finite change, flagged `new`). At least 3 items this week, so single mentions don't top the list.
+- **Publishers are not rising companies.** The classifier often lists the outlet as a company (DatacenterDynamics was "+4,113%" on live data). A company equal to the item's own publisher is ignored for that item. Domain vs name ("nytimes.com" vs "The New York Times") doesn't match; marked `ponytail:` with the upgrade path (an alias table).
+- **Brief model:** reuses `ASSISTANT_MODEL` and its prices instead of a third model setting; it's one call a week.
+- **"Top 30 items of the week":** by the Phase 5 *relevant* score. Trending's gravity favours the last day or two, which is wrong for a weekly summary.
+- **Brief call:** `ChatLLM.stream_text` collected to the end (no new LLM method). Citation numbers outside the 30 sources are removed; a brief with no valid citation, a refusal or `max_tokens` is rejected (not stored, job dead-lettered).
+- **Schema additions (migration 0004):** the `trend_brief` job kind, and model / prompt version / tokens / cost on `trend_briefs`, so the brief's spend shows in `/stats` (§11.5 "store model ID, prompt version, tokens, estimated cost").
+- **Schedule:** Monday 06:00 UTC, enqueued only when the assistant is configured, deduplicated over 6 days. The Admin button is Phase 8; until then `python -m app.jobs enqueue trend_brief`.
+- **`/stats` AI cost** = classifier spend (pipeline runs) + trend briefs. Ask NewsDC answers are only logged; persisting them belongs with the Phase 8 spend cap (D-033).
+- **Not done:** the 60-second TTL cache for `/stats` is in the later performance step (plan "Performance basics"). `/stats` took 80 ms on 3,898 items.
+- **Changes plan:** none in scope.

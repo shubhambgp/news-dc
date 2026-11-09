@@ -4,6 +4,17 @@ All notable changes, grouped by build phase. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 7: Emerging trends and dashboard data (2026-11-09)
+
+#### Added
+- `backend/app/ai/trends.py`: rising topics (tags, companies, technologies; last 7 days vs the 28 before, as shares of the items in each window, ≥3 items this week) and the weekly trend brief (top 30 items of the week by relevant score, rising topics as a hint, `ASSISTANT_MODEL`, citations validated with `CitationFilter`, stored in `trend_briefs` with model, prompt version, tokens and cost).
+- `backend/app/prompts/trend_brief.md` (`trend-brief-v1`, hash pinned by a test).
+- `GET /api/v1/trends` (rising tags/companies/technologies + the latest brief with its numbered sources) and `GET /api/v1/stats` (funnel, items per category with average quality, per content type, per source, per day for 60 days, the last 10 pipeline runs, estimated AI cost) in `backend/app/api/trends.py`.
+- Job kind `trend_brief`: the worker enqueues it every Monday 06:00 UTC when the assistant model is configured; `python -m app.jobs enqueue trend_brief` runs it on demand (the Admin button comes with Phase 8).
+- Migration `0004`: `trend_brief` job kind; `trend_briefs.model`, `prompt_version`, `tokens_in`, `tokens_out`, `cost_usd_estimate`; index on `created_at DESC`.
+- Tests: `tests/test_trends.py` (12, no DB) and `tests/test_trends_db.py` (8, real Postgres).
+- Docs: API.md, ARCHITECTURE.md (rising formula), AI_CONFIG.md (trend brief), D-034.
+
 ### Phase 6: Ask NewsDC, RAG with citations (2026-11-09)
 
 #### Added

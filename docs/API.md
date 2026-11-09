@@ -47,6 +47,8 @@ A well-formed slug or key that doesn't exist returns an empty list. A malformed 
 | `GET /search?q=` | Hybrid search (see below). The response adds `mode` (`hybrid` or `keyword`) and, per hit, `snippet` and `score`. | RRF score DESC | 422 |
 | `POST /ask` | Ask NewsDC: a cited answer from collected items, streamed as Server-Sent Events (see below) | | 411, 413, 422, 429, 503 |
 | `GET /ask/suggestions` | The 5 example questions for the empty Ask screen (`string[]`) | | |
+| `GET /trends` | Rising tags, companies and technologies (up to 10 each) plus the latest trend brief (see below) | `change_pct DESC, recent DESC` | |
+| `GET /stats` | Dashboard data (see below) | | |
 
 ### Sorts and feeds (Phase 5)
 
@@ -127,6 +129,25 @@ Validation, rate-limit and configuration errors (`503 assistant_unavailable` whe
 When nothing matches, the stream is `sources` (empty), one `token` saying the collected sources don't cover the question, then `done`. No LLM call is made. There is no resume and no event IDs: if the connection drops, send the question again. When the client disconnects, the server closes the upstream LLM stream.
 
 Retrieval: hybrid search (keywords OR-ed, plus the embedding) over the question and the previous user question in `history` gives 25 candidates. They are re-ranked by retrieval rank, relevance, quality and freshness down to 8. Questions about recent news ("latest", "this month", "emerging") weigh freshness more. Formula in `docs/ARCHITECTURE.md`.
+
+## Trends and dashboard (Phase 7)
+
+`GET /trends` returns `{recent_start, baseline_start, now, tags, companies, technologies, brief}`.
+
+- Each rising term is `{term, recent, baseline, change_pct, new}`. `recent` and `baseline` are item counts in the last 7 days and the 28 days before. `change_pct` is the change of the *share* of items that mention the term (formula in `docs/ARCHITECTURE.md`). Only rising terms with at least 3 items this week are listed. A company is not counted on items its own outlet published.
+- `brief` is `null` until the first brief exists. Otherwise `{id, period_start, period_end, content_md, sources, model, created_at}`. `content_md` is untrusted Markdown with `[n]` citations; `sources[]` is `{n, id, title, url, publisher, published_at}` and every `[n]` in the text has a matching `n` (items no longer public are left out).
+
+`GET /stats` returns:
+
+| Field | Content |
+|---|---|
+| `funnel` | `{fetched, new, rejected_prefilter, rejected_ai, duplicate, failed, processed}`: every item and its status; `fetched` is the sum |
+| `by_category` | `[{slug, name, items, avg_quality}]` for every category in display order; processed items by primary category, `avg_quality` is `null` with no items |
+| `by_content_type` | `[{key, items}]`, processed items, largest first |
+| `by_source` | `[{key, name, items, processed}]`; every item a source found (any status, via `item_sources`) and how many are processed |
+| `per_day` | `[{date, items}]`, 60 UTC days ending today, processed items by publication date, zero-filled |
+| `pipeline_runs` | The 10 most recent ingest and pipeline runs with their counts, status, cost, `stop_reason` and `error` |
+| `ai_cost` | `{classifier_usd, classifier_today_usd, trend_brief_usd, total_usd}`. Estimates from token counts and the configured prices. Ask NewsDC answers are logged, not stored, so they are not included |
 
 ## Errors
 
