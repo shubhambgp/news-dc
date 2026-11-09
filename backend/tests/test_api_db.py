@@ -409,3 +409,13 @@ def test_utc_sessions(engine):
     with SessionLocal() as s:  # the app's real engine settings, not the test engine
         assert isinstance(s, Session)
         assert s.execute(text("SHOW timezone")).scalar_one() == "UTC"
+
+
+def test_search_sort_latest_keeps_hits_newest_first(data):
+    app.dependency_overrides[common.get_embedder] = lambda: QueryEmbedder({"campus": E0})
+    best = get("/api/v1/search", q="campus")
+    latest = get("/api/v1/search", q="campus", sort="latest")
+    assert set(ids_of(latest, data)) == set(ids_of(best, data))
+    dates = [i["published_at"] for i in latest["items"]]
+    assert dates == sorted(dates, reverse=True)
+    assert client.get("/api/v1/search", params={"q": "campus", "sort": "x"}).status_code == 422

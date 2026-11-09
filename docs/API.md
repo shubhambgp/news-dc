@@ -93,6 +93,7 @@ Read, bookmarked and dismissed items are never returned. The feed ranks the newe
 - `q`: 1–200 characters in web-search syntax (`"exact phrase"`, `-exclude`, `OR`). A blank `q` returns 422.
 - **Keyword retriever:** `websearch_to_tsquery('english', q)` against the title (weight A), description (B), article text (C) and AI summary (B), ranked by `ts_rank_cd`. Returns up to 100 candidates.
 - **Semantic retriever:** cosine distance between the query embedding (bge-small-en-v1.5) and the item embeddings. Hits below `SEARCH_MIN_SIMILARITY` (0.6) are dropped. Returns up to 100 candidates.
+- `sort`: `relevance` (default, the RRF order below) or `latest` (the same hits ordered `published_at DESC, id DESC`).
 - The two lists are fused with Reciprocal Rank Fusion: `score = Σ 1/(60 + rank)`, ties broken by id DESC. `total` is the size of the fused list.
 - `snippet` comes from `ts_headline` over the summary (or the description, or the title). It is **HTML-escaped**, and matched terms are wrapped in `<mark>…</mark>`. It contains no other markup.
 - If the embedding model is unavailable, search runs keyword-only and returns `mode: "keyword"`.

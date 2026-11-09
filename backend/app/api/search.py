@@ -7,7 +7,7 @@ import logging
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, or_, text
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.ai.embeddings import Embedder
@@ -100,6 +100,10 @@ def search(
     pg: Annotated[Pagination, Depends(pagination)],
     db: Annotated[Session, Depends(get_db)],
     embedder: Annotated[Embedder, Depends(get_embedder)],
+    sort: Annotated[
+        Literal["relevance", "latest"],
+        Query(description="`relevance` (RRF score) or `latest` (the same hits, newest first)."),
+    ] = "relevance",
 ) -> SearchPage:
     """Keyword ranking uses `websearch_to_tsquery` and `ts_rank_cd` over the title, description,
     article text and AI summary; semantic ranking uses cosine distance of the query embedding,
@@ -110,6 +114,14 @@ def search(
         raise ApiError(422, "validation_error", "query.q must not be blank")
     tsq = func.websearch_to_tsquery("english", q)
     fused, mode = hybrid(db, embedder, tsq, q, filters)
+    if sort == "latest" and fused:
+        score = dict(fused)
+        newest = db.scalars(
+            select(Item.id)
+            .where(Item.id.in_(score))
+            .order_by(Item.published_at.desc().nulls_last(), Item.id.desc())
+        )
+        fused = [(i, score[i]) for i in newest]
     page = fused[pg.offset : pg.offset + pg.page_size]
     snippet = func.ts_headline(
         "english",
