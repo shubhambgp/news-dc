@@ -13,12 +13,13 @@ from sqlalchemy.orm import Session, defer
 from app.ai.embeddings import Embedder, FastEmbedder
 from app.db import SessionLocal
 from app.models import AIAnnotation, Item, ItemSource, Source
+from app.recommend.scoring import relevant_sql, trending_sql
 from app.schemas import ContentType, ItemSummary, Page, SourceRef
 
 PAGE_SIZE_MAX = 50
 PAGE_MAX = 1000  # bounds the OFFSET a client can request
 SLUG = r"^[a-z0-9][a-z0-9_-]*$"
-Sort = Literal["latest", "relevance", "quality"]
+Sort = Literal["latest", "relevance", "quality", "trending", "relevant"]
 
 
 class ApiError(Exception):
@@ -146,10 +147,9 @@ ORDER: dict[str, tuple[ColumnElement[Any], ...]] = {
     "latest": _NEWEST,
     "relevance": (AIAnnotation.relevance_score.desc().nulls_last(), *_NEWEST),
     "quality": (AIAnnotation.quality_score.desc().nulls_last(), *_NEWEST),
-    "relevant_feed": (
-        (AIAnnotation.relevance_score * AIAnnotation.quality_score).desc().nulls_last(),
-        *_NEWEST,
-    ),
+    # Phase 5 scores (app/recommend/scoring.py), computed at query time.
+    "trending": (trending_sql().desc(), *_NEWEST),
+    "relevant": (relevant_sql().desc(), *_NEWEST),
 }
 
 

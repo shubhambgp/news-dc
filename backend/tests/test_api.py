@@ -1,13 +1,15 @@
 """API contract tests that need no database: validation errors, the error envelope, request IDs,
 security headers, rate limits, OpenAPI, and the pure search helpers."""
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
 from app.api import common
 from app.api.search import render_snippet, rrf
-from app.main import app
+from app.main import MAX_BODY_BYTES, app
 from app.security import reset_rate_limits
 
 client = TestClient(app, raise_server_exceptions=False)
@@ -36,7 +38,9 @@ def assert_error(r, status: int, code: str) -> dict:
         "/api/v1/items?page_size=0",
         "/api/v1/items?page=0",
         "/api/v1/items?page=1001",
-        "/api/v1/items?sort=trending",  # Phase 5
+        "/api/v1/items?sort=hot",
+        "/api/v1/feeds/trending?page_size=51",
+        "/api/v1/topics/cooling?sort=trendy",
         "/api/v1/items?content_type=blog",
         "/api/v1/items?min_quality=101",
         "/api/v1/items?category=Not%20A%20Slug",
@@ -132,6 +136,44 @@ def test_unexpected_error_is_500_envelope_without_details():
     assert "secret" not in err["message"]
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"categoryWeights": {"Not A Slug": 1}},
+        {"categoryWeights": {"cooling": float("inf")}},
+        {"categoryWeights": {"cooling": 1e6}},
+        {"readIds": list(range(1, 202))},  # over 200
+        {"readIds": [0]},
+        {"dismissedIds": ["abc"]},
+        {"tagWeights": {"": 1}},
+        {"tagWeights": {f"t{i}": 1 for i in range(201)}},
+        {"explicitTopics": ["cooling"] * 65},
+        {"unknownField": 1},
+        [],
+    ],
+)
+def test_foryou_profile_validation_is_422(body):
+    """Pydantic rejects these before any DB access."""
+    r = client.post(
+        "/api/v1/feeds/foryou",
+        content=json.dumps(body, allow_nan=True),
+        headers={"Content-Type": "application/json"},
+    )
+    assert_error(r, 422, "validation_error")
+
+
+def test_request_body_size_limits():
+    big = b'{"tagWeights": {"' + b"x" * MAX_BODY_BYTES + b'": 1}}'
+    r = client.post("/api/v1/feeds/foryou", content=big)
+    assert_error(r, 413, "payload_too_large")
+
+    def chunks():
+        yield b"{}"
+
+    r = client.post("/api/v1/feeds/foryou", content=chunks())  # chunked: no Content-Length
+    assert_error(r, 411, "length_required")
+
+
 def test_openapi_lists_every_phase4_endpoint_and_error_shape():
     spec = client.get("/api/v1/openapi.json").json()
     assert set(spec["paths"]) == {
@@ -141,6 +183,8 @@ def test_openapi_lists_every_phase4_endpoint_and_error_shape():
         "/api/v1/items/{item_id}",
         "/api/v1/items/{item_id}/related",
         "/api/v1/feeds/relevant",
+        "/api/v1/feeds/trending",
+        "/api/v1/feeds/foryou",
         "/api/v1/topics",
         "/api/v1/topics/{slug}",
         "/api/v1/search",

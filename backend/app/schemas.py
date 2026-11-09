@@ -3,7 +3,8 @@
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, PlainSerializer
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, StringConstraints
+from pydantic.alias_generators import to_camel
 
 
 def _utc_iso(dt: datetime) -> str:
@@ -131,3 +132,54 @@ class TopicPage(BaseModel):
     name: str
     description: str
     items: Page[ItemSummary]
+
+
+# --- For You (PLAN Phase 5) ---------------------------------------------------------------------
+
+Slug = Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9_-]*$", max_length=64)]
+Tag = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64)]
+Weight = Annotated[float, Field(ge=-1000, le=1000, allow_inf_nan=False)]
+ItemRef = Annotated[int, Field(ge=1, le=2**63 - 1)]
+
+
+class Profile(BaseModel):
+    """The anonymous profile the browser keeps in localStorage. Lists are oldest first, so the
+    last entries are the most recent. Category slugs must exist; unknown fields are rejected."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid")
+
+    category_weights: dict[Slug, Weight] = Field(default_factory=dict, max_length=64)
+    tag_weights: dict[Tag, Weight] = Field(default_factory=dict, max_length=200)
+    read_ids: list[ItemRef] = Field(default_factory=list, max_length=200)
+    bookmark_ids: list[ItemRef] = Field(default_factory=list, max_length=500)
+    dismissed_ids: list[ItemRef] = Field(default_factory=list, max_length=500)
+    explicit_topics: list[Slug] = Field(default_factory=list, max_length=64)
+
+    def is_empty(self) -> bool:
+        """No signal to personalize on (dismissals alone don't say what the user likes)."""
+        return not (
+            any(self.category_weights.values())
+            or any(self.tag_weights.values())
+            or self.read_ids
+            or self.bookmark_ids
+            or self.explicit_topics
+        )
+
+
+FeedKind = Literal["personal", "discover", "trending", "relevant"]
+
+
+class ForYouItem(ItemSummary):
+    kind: FeedKind = Field(
+        description="`personal` (scored on the profile), `discover` (a category the user has not "
+        "engaged with), or `trending` / `relevant` (cold-start fallback)."
+    )
+    reason: str = Field(examples=["Because you read 4 Cooling articles"])
+    score: float
+
+
+class ForYouPage(Page[ForYouItem]):
+    cold_start: bool = Field(
+        description="True when the profile was empty and the feed fell back to Trending + Most "
+        "relevant. The UI shows the topic picker."
+    )

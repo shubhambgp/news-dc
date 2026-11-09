@@ -105,6 +105,24 @@ def install_error_handlers(app: FastAPI) -> None:
         return error_response(request, exc.status_code, code, str(exc.detail))
 
 
+MAX_BODY_BYTES = 64 * 1024  # the largest valid For You profile is well under this
+
+
+async def body_limit(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Request bodies must declare their size and stay under MAX_BODY_BYTES (§11.7). Browsers'
+    fetch() always sends Content-Length for a JSON body, so chunked uploads are refused (411)."""
+    if request.method in ("POST", "PUT", "PATCH"):
+        size = request.headers.get("content-length", "")
+        if not size.isdigit():
+            return error_response(request, 411, "length_required", "Content-Length required")
+        if int(size) > MAX_BODY_BYTES:
+            msg = f"request body over {MAX_BODY_BYTES} bytes"
+            return error_response(request, 413, "payload_too_large", msg)
+    return await call_next(request)
+
+
 async def rate_limit(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
@@ -172,6 +190,7 @@ def create_app() -> FastAPI:
     install_error_handlers(app)
     # Added inner to outer: the rate limiter runs inside CORS (so a 429 is readable by the
     # browser), and request_context wraps everything (so every response gets an ID and a log line).
+    app.middleware("http")(body_limit)
     app.middleware("http")(rate_limit)
     app.add_middleware(
         CORSMiddleware,

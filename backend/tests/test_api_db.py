@@ -316,16 +316,7 @@ def test_related_without_embedding_is_empty_and_missing_is_404(data):
     assert client.get("/api/v1/items/987654321/related").status_code == 404
 
 
-# --- /feeds/relevant ------------------------------------------------------------------------
-
-
-def test_relevant_feed_orders_by_relevance_times_quality(data):
-    body = get("/api/v1/feeds/relevant")
-    # smr 95*90, cool 90*80, old 80*60, then immersion 70*60 and gpu 60*70 tie at 4200 (broken by
-    # published_at DESC: immersion is newer), fiber 80*30.
-    assert ids_of(body, data) == ["smr", "cool", "old", "immersion", "gpu", "fiber"]
-    assert ids_of(get("/api/v1/feeds/relevant", category="cooling"), data) == ["cool", "immersion"]
-    assert get("/api/v1/feeds/relevant", page_size=1)["has_more"] is True
+# /feeds/relevant, /feeds/trending and /feeds/foryou: tests/test_recommend_db.py (Phase 5).
 
 
 # --- /topics --------------------------------------------------------------------------------

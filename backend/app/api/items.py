@@ -19,6 +19,7 @@ from app.api.common import (
     summary_fields,
 )
 from app.models import AIAnnotation, Item, ItemSource, Source
+from app.recommend.scoring import related
 from app.schemas import (
     Coverage,
     DuplicateRef,
@@ -34,7 +35,6 @@ router = APIRouter(tags=["items"])
 ItemId = Annotated[int, Path(ge=1, le=2**63 - 1)]
 RELATED_LIMIT = 6
 RELATED_CANDIDATES = 50
-SHARED_CATEGORY_BOOST = 0.1
 
 
 @router.get("/items", response_model=Page[ItemSummary])
@@ -128,8 +128,7 @@ def related_items(item_id: ItemId, db: Annotated[Session, Depends(get_db)]) -> l
     ranked = []
     for r in rows:
         sim = 1.0 - float(r[4])
-        shared = len(set(my_cats) & set(r[1].categories))
-        ranked.append((sim + SHARED_CATEGORY_BOOST * shared, sim, r))
+        ranked.append((related(sim, len(set(my_cats) & set(r[1].categories))), sim, r))
     ranked.sort(key=lambda t: (-t[0], -t[2][0].id))
     return [
         RelatedItem(**summary_fields(r), similarity=round(sim, 4), score=round(score, 4))
