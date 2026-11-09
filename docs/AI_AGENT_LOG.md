@@ -111,3 +111,20 @@ Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
 | Docs: ARCHITECTURE.md, API.md, DECISIONS D-032, CHANGELOG, CLAUDE.md | Agent | Pending human review |
 | Try the feeds (e.g. POST a profile to `/api/v1/feeds/foryou` in `/api/v1/docs`) and check the reasons make sense | Human | **Pending human verification** |
 
+## Phase 6: Ask NewsDC (RAG with citations)
+
+Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
+
+| Task | Done by | How it was verified |
+|---|---|---|
+| Re-read Phase 6, §11.5, §11.7, §11.8, §12, §13; inspected the Phase 3–5 LLM, search and API code | Agent | n/a |
+| Verified `claude-opus-5-5` with the Models API; set `ASSISTANT_MODEL` in the local `.env` only | Agent | `models.retrieve` output in VERIFICATION_LOG |
+| Streaming `ChatLLM.stream_text` and shared error mapping | Agent | `FakeChat` tests for success, mid-stream errors and disconnect; live streaming with 7 answers. Pending human verification |
+| Retrieval (hybrid top 25 → re-rank to 8, recency for "latest" questions, history-aware query) | Agent | `test_ask_db.py` (5 tests against real Postgres); live answers on 2,609 items. Pending human verification |
+| Prompt `assistant-v1`, evidence block, injection guard, citation filter, no-evidence path | Agent | `test_assistant.py` (31 tests). Pending human verification |
+| SSE endpoint, validation, rate limit, 503 when unconfigured, `/ask/suggestions` | Agent | API tests; live 422 check |
+| Found and fixed: raw RRF normalization made retrieval barely count against freshness | Agent | Found by a failing DB test; rank-position normalization (D-033) |
+| **Acceptance:** five example questions return cited answers, and every `[n]` maps to a real source link | Agent | Live run, verbatim Q&A in VERIFICATION_LOG: ALL OK. Pending human verification |
+| Docs: API.md, ARCHITECTURE.md, AI_CONFIG.md, DECISIONS D-033, RISKS R-005, CHANGELOG, CLAUDE.md, `.env.example` | Agent | Pending human review |
+| Read the Q&A pairs in VERIFICATION_LOG and judge answer quality and faithfulness to the cited sources | Human | **Pending human verification** |
+

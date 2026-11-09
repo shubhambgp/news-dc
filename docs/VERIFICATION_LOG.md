@@ -466,3 +466,235 @@ Failures along the way (all fixed):
 
 Not run: `docker compose` (no Docker, R-001). CI on GitHub (not pushed).
 
+## Phase 6 (2026-11-09)
+
+Environment: same machine and the same PostgreSQL 18.6 + pgvector 0.8.1 cluster (port 55433). `newsdc` holds the live data (2,609 processed items), and `newsdc_test` is the throwaway pytest database. No Docker. No migration. The live checks made real, paid calls to `claude-opus-5-5` (7 answered questions logged at $0.193 in total, plus one interrupted request that was not logged). Tests never call the API (`FakeChat`, plus the autouse `no_real_llm` fixture).
+
+### Automated checks (final state)
+| Command | Result |
+|---|---|
+| `uv lock --check` | `Resolved 111 packages in 1ms` (no dependency changes) |
+| `uv run ruff format --check .` | `63 files already formatted` |
+| `uv run ruff check .` | `All checks passed!` |
+| `uv run mypy app` | `Success: no issues found in 38 source files` |
+| `TEST_DATABASE_URL=...newsdc_test uv run pytest -q` | `324 passed` (new: 31 in `test_assistant.py`, 5 in `test_ask_db.py`) |
+| `uv run pytest -q` (no DB) | `227 passed, 97 skipped` |
+
+What the new tests cover (§11.8): seeded retrieval returns the right items (rejected items never appear); "latest" questions prefer fresh evidence over a better but 120-day-old match (stale evidence); keyword-only fallback; no results means no LLM call; prompt builder formats `[n]` sources (title, publisher, date, URL, summary, insights) and bounds the context; prompt injection in source text stays escaped inside `<source>`; conflicting sources are both passed; fabricated citation numbers are removed, including markers split across chunks; malformed output (empty answer, refusal) ends in `error`, never `done`; `max_tokens` is marked `truncated`; client disconnect closes the LLM stream; SSE order `sources → status → token* → done`; 422 for bad questions or history; the separate rate limit; 503 when unconfigured; the prompt file hash is pinned to `assistant-v1`.
+
+Failures along the way (all fixed):
+- `test_api.py::test_openapi_lists_every_phase4_endpoint_and_error_shape`: the new `/ask` paths weren't in the pinned list. Updated (renamed `..._every_endpoint_...`).
+- mypy: `ChatLLM` not found (an edit script didn't apply), the `MessageParam` TypedDict was ambiguous for history messages (now built with `UserMessageParam`/`AssistantMessageParam`), and `content_type` was `str` vs `Literal`.
+- `test_ask_db.py::test_latest_questions_prefer_recent_evidence`: in normal mode the fresh rank-2 item beat the rank-1 match. Cause: raw RRF scores normalized by the best one were 1.0 vs 0.984, so retrieval barely counted. **Fix:** retrieval strength = `1 − position/25` (D-033, ARCHITECTURE.md). The test now checks the hybrid order and the recent-mode re-rank separately.
+
+### Model check
+`client.models.retrieve("claude-opus-5-5")` returned `Claude Opus 5.5`, `max_input_tokens=1000000`, `max_tokens=128000`, and effort `low…max` supported. (`claude-sonnet-5-5` was also listed.)
+
+### Phase 6 acceptance: the five example questions (live, uvicorn on :8011 against the live DB, final code)
+
+Run with `python ask_examples.py` (a scratch script: it gets `/ask/suggestions`, POSTs each question, parses the SSE stream and checks that every `[n]` in the answer is a returned source with an http(s) link). The output below is verbatim. Every question ended with `done`, and every citation maps to a real source link. Result: **ALL OK**.
+
+#### Q: What are the latest developments in AI data center infrastructure?
+
+events: ['sources', 'status', 'token']... -> ('done', {'cited': [1, 2, 3, 4, 5, 6, 7], 'removed_citations': 0, 'truncated': False})  (10.1s)
+
+Recent coverage points to AI data center work expanding from chips and racks to power grids and networking, alongside rising equipment costs; the newest source is from mid-October 2026, about three weeks old.
+
+- **Industry standards (OCP 2026):** The Open Compute Project is extending its specifications from servers and racks to silicon, cooling, power distribution, facilities and grid integration, which it calls "chip-to-grid" infrastructure [3]. **Meta** detailed its **Prometheus** AI cluster in New Albany, Ohio, including new optical networking, open-source transport software and AI-optimized concrete [3]. **Broadcom** and **NVIDIA** presented Ethernet and optical interconnect advances, and **AMD** and **Arm** also made announcements [3].
+- **Equipment costs:** Stockatomics' AI Infrastructure Index, which tracks monthly prices for GPUs, servers, memory, optics, power and cooling components, is reported at 600.14, up 500.1% from its January 2023 base [6]. The source labels this a November 2026 reading even though it was published October 17. The index measures price per unit of equipment, not cost per unit of compute, which can fall while the index rises [6].
+- **Grid interconnection:** An October arXiv paper finds that coordinating grid-side flexibility with data center workload shifting and UPS storage could raise feasible IT capacity at a constrained connection point from about 10.5–10.6 MW to 15.3–16.0 MW [5]. Most of that gain comes from network reconfiguration on the grid side [5].
+- **Onsite power:** A July paper proposes phased deployment using on-site natural gas generation with grid-forming energy storage to work around multi-year interconnection and equipment lead times [7].
+- **Scale of the largest sites:** Epoch AI finds the record for the largest AI data center has doubled roughly every seven months since **Colossus 1** (August 2024) [1]. It expects no facility to meaningfully exceed **Colossus 2** until the second half of 2027, with **QTS Cedar Rapids** and **Meta Hyperion** due in late 2027 or early 2028 [1].
+- **Multi-site training:** Research explores EVPN-VXLAN for connecting data centers for geo-distributed AI training, motivated partly by data sovereignty requirements [4].
+- **Security:** West Point's Modern War Institute cites Iranian strikes on **AWS** and **Oracle** data centers in the UAE and Bahrain as evidence that AI data centers are becoming strategic targets [2]. 
+
+[1] Largest AI Data Center: Doubling every 7 months | epoch.ai | 2026-06-12 | https://epoch.ai/data-insights/largest-data-center-compute
+[2] Data Center Warfare: Defending AI Infrastructure | mwi.westpoint.edu | 2026-06-20 | https://mwi.westpoint.edu/data-center-warfare-defending-the-key-terrain-of-ai-infrastructure/
+[3] OCP 2026: Agentic AI Pushes the Data Center from Chip to Grid | datacenterfrontier.com | 2026-10-14 | https://www.datacenterfrontier.com/hyperscale/article/55411534/ocp-2026-agentic-ai-pushes-the-data-center-from-chip-to-grid
+[4] ScaleAcross: Designing Multi-Data-Center Infrastructure for Geo-Distributed AI Training | arXiv | 2026-06-11 | https://arxiv.org/abs/2606.12963
+[5] Unlocking AI Data Center Interconnection Capacity Through Coordinated Grid and Data Center Flexibility | arXiv | 2026-10-04 | https://arxiv.org/abs/2610.05502
+[6] AI Infrastructure Index | stockatomics.com | 2026-10-17 | https://www.stockatomics.com/ai-infrastructure-index
+[7] A Phased Development Framework Enabling Islanded Operation of Sustainable AI Data Centers With Onsite Grid-Following and Grid-Forming Energy Architectures | arXiv | 2026-07-19 | https://arxiv.org/abs/2607.17391
+
+citations in answer: [1, 2, 3, 4, 5, 6, 7]; sources returned: 8; all map to a source link: True
+
+#### Q: Which hyperscalers are investing in new data centers?
+
+events: ['sources', 'status', 'token']... -> ('done', {'cited': [1, 4, 5, 6, 7], 'removed_citations': 0, 'truncated': False})  (7.5s)
+
+NewsDC's collected sources name only a few large tech companies investing in new data centers, and they don't provide a full picture of hyperscaler spending.
+
+- **Meta** is building its **Hyperion** data center in Richland Parish, Louisiana, with a planned investment of more than $10 billion and a first phase expected to open in 2028 [6]. Local officials approved the project under the code name Project Sucre through a subsidiary, Laidley LLC, before Meta was publicly identified [6]. Louisiana tax incentives, including an estimated $3.3 billion in sales tax relief on GPUs and networking gear, are worth billions to the company [6]. This source dates from December 2025, nearly 11 months ago.
+- **Alibaba**, **ByteDance** and **Tencent** are investing billions in new data centers across Southeast Asia, where American firms are also seeking capacity [4]. The source does not name the American firms.
+- **Google** has proposed orbital data centres through **Project Suncatcher**, alongside proposals from SpaceX and Blue Origin [7]. These are proposals, not facilities under construction [7].
+
+Related developments:
+
+- **Hyperscale Data**, despite its name, is not described as a hyperscaler. It is converting its former Bitcoin mining site in Dowagiac, Michigan, to AI computing for an unnamed California neocloud customer under a 20 MW contract [5].
+- Several Bitcoin miners, including **Core Scientific**, **Galaxy Digital**, **TeraWulf** and **IREN**, are redirecting mining sites toward AI and HPC workloads [5].
+- Northern Virginia's hyperscale cluster keeps expanding despite resident concern, but the source doesn't say which companies operate the facilities [1]. 
+
+[1] What's It Like Inside a Data Center? | thenation.com | 2026-10-24 | https://www.thenation.com/article/society/inside-a-data-center-hyperscale/
+[4] The Global Data Center Boom Is a Gift to Spies | lawfaremedia.org | 2026-09-10 | https://www.lawfaremedia.org/article/the-global-data-center-boom-is-a-gift-to-spies
+[5] Goodbye Bitcoin, Hello AI Data Center | americanbuildout.com | 2026-09-02 | https://americanbuildout.com/goodbye-bitcoin-hello-ai-data-center/
+[6] The Power Play Behind Hyperion, Meta's Big Data Center Being Built in Louisiana | sherwood.news | 2025-12-19 | https://sherwood.news/tech/hyperion/
+[7] The earthly limits of data centre resistance | policyreview.info | 2026-06-10 | https://policyreview.info/articles/news/data-centre-resistance/2102
+
+citations in answer: [1, 4, 5, 6, 7]; sources returned: 8; all map to a source link: True
+
+#### Q: What is emerging in liquid cooling and power availability?
+
+events: ['sources', 'status', 'token']... -> ('done', {'cited': [1, 2, 3, 4, 5, 6, 7, 8], 'removed_citations': 0, 'truncated': False})  (8.4s)
+
+The sources show liquid cooling moving toward warm-water designs, retrofits for existing air-cooled halls and optimized cold plates; NewsDC's collected sources don't cover power availability (grid supply or securing power for sites).
+
+**Liquid cooling**
+- **Higher-temperature designs:** **NVIDIA** describes liquid cooling for its Rubin-generation AI infrastructure that runs at up to 45°C with closed-loop dry coolers, allowing chiller-less operation in favorable climates [3].
+  - NVIDIA says this cuts facility water use from about 2.6 million gallons per megawatt per year to near zero [3].
+  - It describes Rubin-generation systems as 100% liquid cooled, with no fans [3].
+- **Retrofitting air-cooled sites:** **Google**'s **Brazos** is a rack-mounted, closed-loop liquid-to-air system for running high-density liquid-cooled equipment in existing air-cooled data centers [5].
+  - It supports 60 kW nominal thermal load per rack and can be installed one rack at a time, avoiding chilled-water retrofits [5].
+  - It is described as generally available, with open-sourcing planned through the Open Compute Project [5].
+- **Cold plate innovation:**
+  - **University of Illinois Urbana-Champaign** researchers developed 3D-printed, topology-optimized pure copper cold plates [8]. They estimate cooling's share of data center electricity could fall from about 30% to about 1.1% [8].
+  - A generative design method for **NVIDIA GB200** cold plates reports more than 5°C lower average and over 35°C lower maximum temperatures than a baseline parallel-channel design [6].
+- **Modeling and optimization:**
+  - A new EnergyPlus model of direct-to-chip cooling reports, in a case study, that warm-water liquid cooling lowers annual PUE from 1.43 to 1.25 and cuts facility energy by 37.9% compared with air cooling [2].
+  - A machine-learning study on the **Frontier** supercomputer finds up to 96% of about 85 MWh of annual excess cooling energy could be recovered through small setpoint changes [7].
+- **Operations and adoption:**
+  - Liquid cooling makes precise, real-time measurement across both liquid and air environments essential [1].
+  - Single-phase cooling currently predominates, while two-phase and immersion cooling are growing [4].
+
+**Power availability**
+- The sources only touch on power indirectly:
+  - Cooling is cited as up to 40% of data center electricity use [3], or about 30% [8].
+  - Brazos requires legacy facilities to have sufficient power [5]. 
+
+[1] Liquid Cooling Is Changing What Data Centers Need to Measure | Data Center Knowledge | 2026-11-04 | https://www.datacenterknowledge.com/cooling/liquid-cooling-is-changing-what-data-centers-need-to-measure
+[2] Modeling Liquid-Cooled Data Centers in EnergyPlus | arXiv | 2026-10-23 | https://arxiv.org/abs/2610.33148
+[3] 45°C cooling design cuts data center water use to near zero | blogs.nvidia.com | 2026-06-24 | https://blogs.nvidia.com/blog/liquid-cooling-ai-factories/
+[4] Liquid Cooling Gains Traction in Data Centers | semiengineering.com | 2026-01-22 | https://semiengineering.com/liquid-cooling-gains-traction-in-data-centers/
+[5] Brazos: Liquid cooling system for air-cooled data centers | cloud.google.com | 2026-06-16 | https://cloud.google.com/blog/topics/systems/brazos-liquid-cooling-system-for-air-cooled-data-centers/
+[6] Generative Design for Direct-to-Chip Liquid Cooling for Data Centers | arXiv | 2026-04-13 | https://arxiv.org/abs/2604.10941
+[7] Machine Learning Guided Cooling System Optimization for Data Center | arXiv | 2026-01-05 | https://arxiv.org/abs/2601.02275
+[8] Cooling copper plates could slash data center energy use by 90% | newatlas.com | 2026-05-20 | https://newatlas.com/energy/cooling-copper-plates-data-center-energy-use/
+
+citations in answer: [1, 2, 3, 4, 5, 6, 7, 8]; sources returned: 8; all map to a source link: True
+
+#### Q: Which articles discuss GPU utilization optimization?
+
+events: ['sources', 'status', 'token']... -> ('done', {'cited': [1, 2, 3, 4, 5, 6, 7, 8], 'removed_citations': 0, 'truncated': False})  (8.4s)
+
+Several of NewsDC's collected sources address GPU utilization optimization, from power- and thermal-aware control to scheduling, virtualization, profiling and kernel-level tuning.
+
+**Power, thermal and grid-aware control**
+- **GPU-to-Grid** (arXiv): Uses LLM inference batch size as a control knob that trades off GPU power, latency and token throughput, so data centers can help regulate grid voltage [1].
+- **Coordinated Cooling and Compute Management** (arXiv): Jointly tunes GPU parallelism, DVFS frequency and cooling controls, evaluated with Azure inference traces, to balance serving latency against thermal limits [6].
+- **Lit Silicon** (arXiv): Finds that thermal imbalance creates straggler GPUs in multi-GPU LLM training. It reports up to 6% performance and 4% power improvements on AMD MI300X systems through power management strategies [4].
+
+**Prediction and scheduling**
+- **Two-Stage GPU Resource and Power Prediction** (arXiv): Predicts maximum GPU utilization with up to 97% accuracy and runtime power with up to 92% accuracy on NERSC's Perlmutter system, to support more efficient, power-aware scheduling [2].
+
+**Sharing and profiling**
+- **GPU-Virt-Bench** (arXiv): Benchmarks software-based GPU virtualization (HAMi-core, BUD-FCSP) against simulated NVIDIA MIG baselines for multi-tenant GPU sharing, including fragmentation and scheduling metrics [3].
+- **Zymtrace vs. Nsight** (zymtrace.com): Argues that continuous, eBPF-based cluster profiling helps maximize throughput per GPU, per watt and per dollar [7].
+
+**Software performance tuning**
+- **GPT-OSS Optimizations on Nvidia Blackwell** (blog.vllm.ai): Reports +38% maximum throughput and +13% best interactivity for gpt-oss-120b on B200/GB200, using FlashInfer kernels and torch.compile fusions [5].
+
+**More tangential**
+- **NVIDIA GQE**: Covers GPU-accelerated SQL execution and identifies memory and I/O bandwidth as the main constraints, rather than utilization tuning as such [8]. 
+
+[1] GPU-to-Grid: Voltage Regulation via GPU Utilization Control | arXiv | 2026-02-04 | https://arxiv.org/abs/2602.05116
+[2] A Practical Two-Stage Framework for GPU Resource and Power Prediction in Heterogeneous HPC Systems | arXiv | 2026-04-02 | https://arxiv.org/abs/2604.02158
+[3] GPU-Virt-Bench: A Comprehensive Benchmarking Framework for Software-Based GPU Virtualization Systems | arXiv | 2025-11-26 | https://arxiv.org/abs/2512.22125
+[4] Lit Silicon: A Case Where Thermal Imbalance Couples Concurrent Execution in Multiple GPUs | arXiv | 2025-11-13 | https://arxiv.org/abs/2511.09861
+[5] GPT-OSS Optimizations on Nvidia Blackwell: Pushing the Pareto Frontier | blog.vllm.ai | 2026-02-25 | https://blog.vllm.ai/2026/02/01/gpt-oss-optimizations.html
+[6] Coordinated Cooling and Compute Management for AI Datacenters | arXiv | 2026-01-13 | https://arxiv.org/abs/2601.08113
+[7] Zymtrace vs. Nsight: Profiling Nvidia GPU Clusters at Scale | zymtrace.com | 2026-01-09 | https://zymtrace.com/article/zymtrace-nsight/
+[8] Designing GPU-Accelerated Query Engines with NVIDIA GQE | developer.nvidia.com | 2026-07-06 | https://developer.nvidia.com/blog/designing-gpu-accelerated-query-engines-with-nvidia-gqe/
+
+citations in answer: [1, 2, 3, 4, 5, 6, 7, 8]; sources returned: 8; all map to a source link: True
+
+#### Q: What technologies could improve PUE and WUE?
+
+events: ['sources', 'status', 'token']... -> ('done', {'cited': [1, 3, 4, 6, 7], 'removed_citations': 0, 'truncated': False})  (6.8s)
+
+The only technology NewsDC's sources directly link to better PUE is a **digital twin** framework for energy optimization, and none of them describe a technology that improves WUE.
+
+**Directly tied to PUE**
+- **Digital twin with IoT and machine learning:** A scalable framework monitors power, temperature and workload in real time and uses LSTM models to forecast energy demand [3]. The authors report lower power consumption and improved PUE, but only in a small-scale controlled data center, not in production facilities [3].
+
+**Related efficiency technologies (sources don't report PUE or WUE effects)**
+- **Diamond-copper thermal interface coating:** The Chinese Academy of Sciences' Ningbo Institute says it improved cooling efficiency by 80% and chip performance by 10% at an AI computing node in Zhengzhou [6]. The composite reportedly exceeds 1,000 W/mK thermal conductivity [6].
+- **Server configuration adjustments:** A measurement-based study in an operational data center found that these change the energy consumption of processing jobs [7]. It recommends ways to cut server energy use while weighing performance and carbon emissions [7].
+- **Waste heat recovery:** Reusing data center heat to supply buildings in an integrated energy system cut total energy costs by about 10% in case studies [4].
+
+**Measurement**
+- **deoks-pue-wue-validator:** This zero-dependency Python tool validates CSV data and calculates PUE and WUE [1]. It measures the metrics but does not improve them.
+
+NewsDC's collected sources don't cover water-saving technologies or anything else specifically aimed at WUE. 
+
+[1] indeokman/deoks-pue-wue-validator | GitHub | 2026-11-09 | https://github.com/indeokman/deoks-pue-wue-validator
+[3] A Scalable Digital Twin Framework for Energy Optimization in Data Centers | arXiv | 2026-05-07 | https://arxiv.org/abs/2605.05581
+[4] End-to-End Learning-based Operation of Integrated Energy Systems for Buildings and Data Centers | arXiv | 2026-03-31 | https://arxiv.org/abs/2604.14184
+[6] Chinese diamond-based coating boosts data center cooling efficiency by 80% | thecoolingreport.com | 2026-04-21 | https://thecoolingreport.com/intel/diamond-copper-composite-coating-chinese-academy-sciences-cooling-efficiency.html
+[7] Improving the Energy Efficiency of High Throughput Computing: A Measurement-Based Case Study | arXiv | 2026-08-06 | https://arxiv.org/abs/2608.06622
+
+citations in answer: [1, 3, 4, 6, 7]; sources returned: 8; all map to a source link: True
+
+ALL OK
+
+Logged per answer (`ask answered` lines in the uvicorn log, in order: the five above, the follow-up, the off-topic question):
+
+| # | tokens in | tokens out | latency ms | cited/sources | removed | cost |
+|---|---|---|---|---|---|---|
+| 1 | 4016 | 954 | 9496 | 7/8 | 0 | $0.035888 |
+| 2 | 4074 | 759 | 7441 | 5/8 | 0 | $0.028798 |
+| 3 | 3805 | 961 | 8390 | 8/8 | 0 | $0.031762 |
+| 4 | 3814 | 889 | 8309 | 8/8 | 0 | $0.030358 |
+| 5 | 3375 | 675 | 6766 | 5/8 | 0 | $0.024322 |
+| 6 | 4151 | 571 | 5748 | 4/8 | 0 | $0.025346 |
+| 7 | 3662 | 222 | 2870 | 2/8 | 0 | $0.01641 |
+
+#### Follow-up (multi-turn)
+`{"question":"Which of those are in Europe?","history":[user: "Which hyperscalers are investing in new data centers?", assistant: "Meta is building Hyperion in Louisiana [6]; Alibaba, ByteDance and Tencent invest in Southeast Asia [4]."]}`. Retrieval used both questions and returned Europe-related sources (Ireland/Dublin grid, EU plans, Gulf vs Europe).
+
+> **None of the hyperscaler investments named in NewsDC's current sources are in Europe.** The sources don't name any specific hyperscaler building new data centers there.
+> 
+> - **Alibaba, ByteDance and Tencent** are investing billions in new data centers across Southeast Asia, not Europe [4].
+> - **Meta's** Hyperion project in Louisiana isn't covered in the current sources.
+> 
+> What the sources do say about Europe:
+> 
+> - **Ireland:** Hyperscale data center growth around Dublin is diverting grid capacity and driving transmission upgrades. The state is funding emergency fossil-fuel generators to keep supply stable [5]. The sources don't name the hyperscalers involved.
+> - **Local opposition:** Communities near Dublin, including Rochfortbridge and Naas, are opposing new developments [5]. Local, legal and political resistance to data centres is also growing elsewhere in Europe [7].
+> - **EU plans:** The EU plans to triple its data center capacity under the AI Continent Action Plan [5].
+> - **Permitting hurdles:** Grid, permitting and opposition problems in parts of Europe contrast with the Gulf, where governments can coordinate energy, land and capital [2].
+
+`data: {"cited":[2,4,5,7],"removed_citations":0,"truncated":false}`
+
+#### Off-topic
+`{"question":"What is the best sourdough bread recipe?"}`. The OR-ed keywords still matched 8 items (on "best" and "recipe"), so the model was called, and it declined correctly from the evidence:
+
+> NewsDC's collected sources don't cover sourdough bread or any baking recipes. They focus on data center topics such as GPU cluster configuration, grid interconnection and AI model training.
+> 
+> The only "recipes" in these sources are technical ones:
+> 
+> - **AICR v1.0** from NVIDIA provides version-locked, validated recipes for configuring GPU-accelerated Kubernetes clusters [1].
+> - A paper on the **SuperMUC-NG Phase 2** system describes a "scalable recipe" for training language models of up to 175 billion parameters [5].
+> 
+> For a sourdough recipe, you'll need a cooking or baking resource. I can help with any data center questions.
+
+`data: {"cited":[1,5],"removed_citations":0,"truncated":false}`
+
+#### Other live checks
+- `POST /ask {"question":"hi"}` → `{"error":{"code":"validation_error","message":"body.question: String should have at least 3 characters","request_id":"7c90b57e100145549234cbbc31af88c0"}}`.
+- The first off-topic attempt was piped through `head -c`, which closed the connection after `sources`/`status`. No `ask answered` line was logged for it: the server stopped streaming when the client went away.
+
+### Observations (not failures)
+- The follow-up answer says Meta's Hyperion "isn't covered in the current sources". That's true, because the second turn retrieved a new source list. The rule of citing only the current list works as designed, but it can read oddly.
+- "What is emerging in liquid cooling and power availability?" retrieved 8 cooling items, and the answer says power availability isn't covered, although the corpus has power items. Retrieval favours the dominant topic of a two-topic question. A possible fix (split retrieval per topic) is noted for later; no change was made.
+- An off-topic question still costs one LLM call (about $0.025) because OR-ed keywords match common words. A minimum-evidence threshold would save it.
+
+Not run: `docker compose` (no Docker, R-001). CI on GitHub (not pushed). Pricing for Opus 5.5 ($4/$20 per MTok) was **not** re-checked on the live pricing page.

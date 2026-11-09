@@ -4,6 +4,24 @@ All notable changes, grouped by build phase. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 6: Ask NewsDC, RAG with citations (2026-11-09)
+
+#### Added
+- `POST /api/v1/ask` (`backend/app/api/ask.py`): Server-Sent Events with `sources`, `status`, `token`*, then `done` or `error`. Hybrid retrieval gets 25 candidates (keywords OR-ed plus the embedding of the question and the previous question), which are re-ranked by retrieval rank, relevance, quality and freshness to 8. Freshness weighs more for "latest"-type questions. Retrieval runs before the stream, and the DB session is closed while the answer streams. A client disconnect closes the LLM stream.
+- `GET /api/v1/ask/suggestions`: the five example questions from the brief.
+- `backend/app/ai/assistant.py`: the numbered, escaped evidence block (`[n]` title, publisher, date, URL, summary, insights; bounded), message builder with history, `CitationFilter` (removes citation numbers that don't map to a source, also when split across chunks), time-sensitivity detection, and the fixed no-evidence answer (no LLM call).
+- `backend/app/prompts/assistant.md` (`assistant-v1`, hash pinned by a test): grounding, "say when not covered", conflicts, dates, prompt-injection guard, citation and style rules.
+- `ChatLLM.stream_text` in `backend/app/ai/llm.py` (Anthropic `messages.stream`, effort, cached system prompt). Errors map to `LLMError` through the same function as `complete_json`.
+- `scoring.ask_rank` (re-rank formula, documented in `docs/ARCHITECTURE.md`).
+- `AskRequest` (question 3–500 chars; history ≤ 4 messages as user/assistant pairs) and `AskSource` schemas.
+- Settings / `.env.example`: `ASSISTANT_EFFORT`, `ASSISTANT_MAX_TOKENS`, `ASSISTANT_INPUT_USD_PER_MTOK`, `ASSISTANT_OUTPUT_USD_PER_MTOK`, `RATE_LIMIT_ASK` (10/minute per IP). Each answer logs model, prompt version, tokens, latency, estimated cost and citation counts (never the question).
+- Tests: `tests/test_assistant.py` (31, no DB) and `tests/test_ask_db.py` (5, real Postgres). `FakeChat` in `tests/fakes.py`.
+- Docs: `/ask` contract in `docs/API.md`, retrieval in `docs/ARCHITECTURE.md`, assistant section in `docs/AI_CONFIG.md`, D-033.
+
+#### Changed
+- `search.hybrid()` was extracted from `GET /search` (same behaviour) so `/ask` reuses it.
+- `AnthropicLLM` error mapping moved into `_llm_error()`, shared by both methods.
+
 ### Phase 5: Recommendation engine (2026-11-09)
 
 #### Added

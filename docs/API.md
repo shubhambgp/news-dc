@@ -2,7 +2,7 @@
 
 Base path: `/api/v1`. The interactive OpenAPI docs are at `/api/v1/docs` and the schema is at `/api/v1/openapi.json`. Request and response models live in `backend/app/schemas.py`.
 
-Every endpoint below is **public** and read-only, and is **rate limited** to `RATE_LIMIT_DEFAULT` (60/minute) per client IP. `/health` and `/ready` are the exceptions: they aren't rate limited. `POST /feeds/foryou` is the only endpoint that takes a request body. Admin endpoints arrive in Phase 8.
+Every endpoint below is **public** and read-only, and is **rate limited** to `RATE_LIMIT_DEFAULT` (60/minute) per client IP. `/health` and `/ready` are the exceptions: they aren't rate limited. `POST /ask` has an extra limit, `RATE_LIMIT_ASK` (10/minute). `POST /feeds/foryou` and `POST /ask` are the only endpoints that take a request body. Admin endpoints arrive in Phase 8.
 
 ## Conventions
 
@@ -45,6 +45,8 @@ A well-formed slug or key that doesn't exist returns an empty list. A malformed 
 | `GET /topics` | Enabled categories in display order, each with `item_count` and its 3 newest items (`latest`) | `sort_order` | |
 | `GET /topics/{slug}` | `{slug, name, description, items: Page}` for one enabled category | same `sort` as `/items` | 404 (unknown or disabled), 422 |
 | `GET /search?q=` | Hybrid search (see below). The response adds `mode` (`hybrid` or `keyword`) and, per hit, `snippet` and `score`. | RRF score DESC | 422 |
+| `POST /ask` | Ask NewsDC: a cited answer from collected items, streamed as Server-Sent Events (see below) | | 411, 413, 422, 429, 503 |
+| `GET /ask/suggestions` | The 5 example questions for the empty Ask screen (`string[]`) | | |
 
 ### Sorts and feeds (Phase 5)
 
@@ -92,6 +94,39 @@ Read, bookmarked and dismissed items are never returned. The feed ranks the newe
 - The two lists are fused with Reciprocal Rank Fusion: `score = Σ 1/(60 + rank)`, ties broken by id DESC. `total` is the size of the fused list.
 - `snippet` comes from `ts_headline` over the summary (or the description, or the title). It is **HTML-escaped**, and matched terms are wrapped in `<mark>…</mark>`. It contains no other markup.
 - If the embedding model is unavailable, search runs keyword-only and returns `mode: "keyword"`.
+
+## Ask NewsDC (Phase 6)
+
+`POST /api/v1/ask` with a JSON body. Use `fetch()` and read `response.body` with a `ReadableStream` reader; browser `EventSource` can't send a POST body.
+
+```json
+{
+  "question": "Which of those are in Europe?",
+  "history": [
+    {"role": "user", "content": "Which hyperscalers are investing in new data centers?"},
+    {"role": "assistant", "content": "Meta is building Hyperion in Louisiana [6] …"}
+  ]
+}
+```
+
+| Field | Rule |
+|---|---|
+| `question` | 3–500 characters after trimming |
+| `history` | Optional. At most 4 messages: complete `user`, `assistant` pairs, oldest first. Each `content` is 1–4,000 characters. Unknown fields or roles are a 422 |
+
+Validation, rate-limit and configuration errors (`503 assistant_unavailable` when `ASSISTANT_MODEL` or the API key is unset) are normal JSON error envelopes, sent before the stream starts. After that the response is `200 text/event-stream` (`Cache-Control: no-cache`, `X-Accel-Buffering: no`). Each event is `event: <name>\ndata: <json>\n\n`:
+
+| Event | When | `data` |
+|---|---|---|
+| `sources` | Always first | `{"sources": [{n, id, title, url, publisher, published_at, source: {key, name}, primary_category, content_type}]}`. Up to 8. `[n]` in the answer refers to `n`. Links come from the database, never from the model. Empty when nothing matched |
+| `status` | Before generation starts | `{"stage": "generating"}` |
+| `token` | Many times | `{"text": "…"}`. Markdown text. Citation numbers that don't match a source have already been removed |
+| `done` | Success, last event | `{"cited": [1, 3], "removed_citations": 0, "truncated": false}`. `truncated` means the answer hit `ASSISTANT_MAX_TOKENS` |
+| `error` | Failure, last event | `{"code": "llm_unavailable" \| "llm_error" \| "no_answer", "message": "…"}`. Discard any tokens already shown. `done` never follows an `error` |
+
+When nothing matches, the stream is `sources` (empty), one `token` saying the collected sources don't cover the question, then `done`. No LLM call is made. There is no resume and no event IDs: if the connection drops, send the question again. When the client disconnects, the server closes the upstream LLM stream.
+
+Retrieval: hybrid search (keywords OR-ed, plus the embedding) over the question and the previous user question in `history` gives 25 candidates. They are re-ranked by retrieval rank, relevance, quality and freshness down to 8. Questions about recent news ("latest", "this month", "emerging") weigh freshness more. Formula in `docs/ARCHITECTURE.md`.
 
 ## Errors
 

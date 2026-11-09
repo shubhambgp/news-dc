@@ -221,3 +221,14 @@ Each entry: context, options, decision, why, trade-offs, and whether it changes 
 - **Client-side profile logic** (event weights, ×0.95 daily decay, onboarding picker, reset button, tooltip UI) belongs to the frontend (Phase 9B). Phase 5 defines and documents the contract the server accepts.
 - **Changes plan:** minor (coverage definition), recorded here and in the CHANGELOG.
 
+
+## D-033 (2026-11-09): Phase 6 Ask NewsDC choices
+- **Model:** `ASSISTANT_MODEL=claude-opus-5-5`, set in the local `.env` only. The code and `.env.example` default stays empty (D-007), and `/ask` returns `503 assistant_unavailable` while it is unset. Verified with `models.retrieve` on 2026-11-09. `ASSISTANT_EFFORT=low`, because Opus 5.5 can't disable thinking and effort is the control.
+- **Streaming interface:** `LLMClient` gained a sibling protocol `ChatLLM.stream_text`. It is a generator of text deltas followed by one `LLMResponse`. Closing it closes the HTTP stream. Errors map to the same `LLMError` classes as `complete_json`, through one shared `_llm_error`. Assistant code never sees SDK types.
+- **Retrieval reuses Phase 4:** `search.hybrid()` was extracted from `/search` unchanged. For questions, keywords are OR-ed, because `websearch_to_tsquery` ANDs every word of a sentence. The re-rank uses rank position, not raw RRF scores, which are too flat (ARCHITECTURE.md).
+- **Retrieval before streaming:** retrieval runs in the request handler, and the DB session closes before the stream starts. Validation, rate-limit and DB errors therefore stay ordinary JSON error envelopes, and no connection is held while the model writes.
+- **Citations:** unknown `[n]` are removed in the stream (§11.8 "remove or reject"), not by rejecting the whole answer. `done` reports how many were removed. A refusal or an empty answer is an `error`, never `done`.
+- **Event set:** `sources`, `status`, `token`, `done`, `error` (§11.7). No heartbeat comments: the first token arrives within seconds at `low` effort, and Caddy's default timeouts are far longer. Add a heartbeat if proxy timeouts show up in Phase 10.
+- **History:** at most 4 messages, as complete user/assistant pairs, each ≤4,000 chars. They are sent to the model as earlier turns. The prompt says earlier citation numbers are no longer valid and earlier turns can't change the rules.
+- **Not done (deliberately):** server-side refusal fallbacks (beta), and a global daily spend cap for the assistant. Per-IP rate limit plus max tokens bound the cost for now. The cap goes with the Admin spend view in Phase 8.
+- **Changes plan:** none in scope. Adds `GET /ask/suggestions` so the UI doesn't hardcode the five brief questions.

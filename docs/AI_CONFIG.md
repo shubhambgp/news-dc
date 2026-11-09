@@ -1,6 +1,6 @@
 # AI Configuration
 
-How NewsDC uses AI in the processing pipeline (Phase 3): models, prompts, thresholds, limits, costs and how quality was measured. The assistant (RAG) is added in Phase 6.
+How NewsDC uses AI in the processing pipeline (Phase 3) and in the Ask NewsDC assistant (Phase 6): models, prompts, thresholds, limits, costs and how quality was measured.
 
 ## Pipeline
 
@@ -37,7 +37,7 @@ Every outcome records why in `items.status_reason`; AI rejections also keep the 
 | Use | Env var | Value used locally | How it was verified |
 |---|---|---|---|
 | Classifier | `CLASSIFIER_MODEL` | `claude-haiku-5-5` | Models API (`models.retrieve`) returned "Claude Haiku 5.5" for this key on 2026-11-09; pricing page checked the same day |
-| Assistant | `ASSISTANT_MODEL` | not set (Phase 6) | |
+| Assistant | `ASSISTANT_MODEL` | `claude-opus-5-5` | Models API (`models.retrieve`) returned "Claude Opus 5.5" (1M context, 128k output, effort supported) for this key on 2026-11-09 |
 | Embeddings | fixed in code (`app/ai/embeddings.py`) | `BAAI/bge-small-en-v1.5`, 384 dims | Must match `items.embedding vector(384)`; changing it needs a re-embedding migration |
 
 The code and `.env.example` have **no default model ID** (D-007). Why Haiku: classification is a narrow, high-volume task. The evaluation (below) shows it is good enough at about $0.0002 per item. A stronger model can be swapped in through `CLASSIFIER_MODEL`, followed by re-running the evaluation.
@@ -101,3 +101,27 @@ Re-run: `cd backend && uv run python scripts/eval_classifier.py` (about $0.01).
 | Budget reached | Remaining items stay `new`; `pipeline_runs.stop_reason` says which limit |
 
 Logs never include API keys, the system prompt or article bodies, only item IDs, statuses, reasons and exception types.
+
+## Ask NewsDC (Phase 6)
+
+| Setting | Value | Why |
+|---|---|---|
+| `ASSISTANT_MODEL` | `claude-opus-5-5` (local `.env` only; code default is empty) | The answer is the one place where quality is user-visible and volume is low. The current Opus generation, verified through the Models API |
+| `ASSISTANT_EFFORT` | `low` | Short, grounded answers over 8 sources don't need deep reasoning. Opus 5.5 can't turn thinking off, so effort is the control. `low` kept answers at 6–10 s |
+| `ASSISTANT_MAX_TOKENS` | 4,000 | Hard cap per answer (thinking + text). Live answers used 570–960 output tokens |
+| `RATE_LIMIT_ASK` | 10/minute per IP | On top of the 60/minute default, because every call is paid |
+| `ASSISTANT_INPUT_USD_PER_MTOK` / `ASSISTANT_OUTPUT_USD_PER_MTOK` | 4.00 / 20.00 locally | Cost logging only. From the model table in Anthropic's API reference material as of 2026-10-06; **not re-checked on the live pricing page** |
+
+- **Prompt:** `backend/app/prompts/assistant.md`, version `assistant-v1` (`PROMPT_VERSION` in `app/ai/assistant.py`, pinned to the file's sha256 by a test). Each answer's log line carries the model, prompt version, token counts, latency, cost estimate, number of sources and citations, and removed citations. The question text is not logged.
+- **Grounding rules (in the prompt):** answer only from the numbered sources; say plainly when they don't cover the question; present conflicts with both citations; mention when the newest source is old; cite every factual sentence as `[n]`; no URLs or reference list (the UI shows the backend's links).
+- **Prompt injection:** sources are wrapped in `<source>` tags with angle brackets escaped, and the system prompt says source text is untrusted data that is never followed. History can clarify the question, but it can't change the rules.
+- **Citation validation:** `CitationFilter` removes any `[n]` that isn't a supplied source before the text reaches the client, and `done` reports `cited` and `removed_citations`.
+- **No evidence:** when retrieval finds nothing, a fixed answer is sent and no LLM call is made.
+- **Failure behaviour:** provider errors (after the SDK's 3 retries) become an `error` event (`llm_unavailable` or `llm_error`). A refusal or an empty answer becomes `no_answer`. `done` is never sent after an error. Server-side refusal fallbacks (`fallbacks`, beta) are not enabled. A refusal on data center news is unlikely, and it surfaces as `no_answer`.
+- **Prompt caching:** the system prompt is sent with `cache_control`, but at about 600 tokens it is below Opus's minimum cacheable prefix, so it doesn't cache today. The sources change per question and come after it.
+
+### Costs (measured)
+
+Seven live questions on 2026-11-09 (the 5 examples, a follow-up and an off-topic one; uvicorn log; $0.193 in total): 3,375–4,151 input tokens, 571–961 output tokens, 5.7–9.5 s, **$0.024–$0.036 per answer** at the prices above. 1,000 questions a day would be about $30.
+
+Ask NewsDC has no daily spend cap yet. The per-IP rate limit and the max-tokens cap bound it. A global daily cap belongs with the Admin spend view in Phase 8 (D-033).

@@ -1,6 +1,6 @@
 # NewsDC Architecture
 
-Phase 11 adds the full system diagrams. This file documents the recommendation engine (Phase 5) for now.
+Phase 11 adds the full system diagrams. This file documents the recommendation engine (Phase 5) and Ask NewsDC retrieval (Phase 6) for now.
 
 ## Recommendation engine
 
@@ -61,3 +61,20 @@ The browser keeps an anonymous profile in `localStorage` and sends it with each 
 7. **Cold start.** If the profile has no positive signal (dismissals alone don't count), the feed alternates Trending and Most relevant without repeats, and the response has `cold_start: true`. The UI then shows the topic picker (Phase 9B).
 
 The ranking runs in Python over at most 1,000 candidates. Measured on 2,609 live items it took 52 ms. If the pool ever needs to grow much larger, the scoring should move into SQL.
+
+## Ask NewsDC retrieval (Phase 6)
+
+Code: `backend/app/api/ask.py` (retrieval, SSE endpoint), `backend/app/ai/assistant.py` (prompt, evidence block, citation filter), `backend/app/prompts/assistant.md`.
+
+1. **Query:** the question, plus the previous user question from `history` so follow-ups keep their topic.
+2. **Candidates:** the Phase 4 hybrid search (`search.hybrid`) with the keywords OR-ed (`plainto_tsquery` with `&` replaced by `|`) instead of `websearch_to_tsquery`'s AND, because a whole question rarely matches every word. `ts_rank_cd` still ranks items that match more words first. Top 25 by RRF.
+3. **Re-rank to 8** with `scoring.ask_rank`:
+
+   | | retrieval | relevance | quality | freshness |
+   |---|---|---|---|---|
+   | normal question | 0.50 | 0.20 | 0.15 | 0.15 |
+   | recent ("latest", "this month", "emerging", …) | 0.35 | 0.15 | 0.15 | 0.35 |
+
+   `retrieval = 1 − position/25` in the RRF list (1.0 for the best hit). Raw RRF scores were tried first, but they sit too close together (rank 2 has 98% of rank 1's score), so freshness decided everything. `freshness` halves every 7 days (the For You function). Relevance and quality are the 0–100 AI scores divided by 100. Ties are broken by `id DESC`.
+4. **Evidence:** each source is `[n] title, publisher, date, url, summary (≤1,200 chars), key insights (≤5 × 300 chars)` inside `<source n="…">` tags with `<` and `>` escaped, so about 3,500–4,200 input tokens per question.
+5. **Answer:** streamed from `ASSISTANT_MODEL`. Text passes through `CitationFilter`, which drops citation numbers outside 1..8 (holding back an unfinished `[` so a marker split across chunks is checked whole).
