@@ -48,6 +48,8 @@ class SourceConfig(_Strict):
     queries: list[str] = Field(default_factory=list)
     # Per-run cap on fetched rows; a capped backfill resumes from its checkpoint next run.
     max_items_per_run: int = Field(default=1000, gt=0, le=10000)
+    # Every item from this source is about data centers, so the keyword pre-filter passes it.
+    dc_specific: bool = False
 
     @model_validator(mode="after")
     def _enabled_needs_terms(self) -> Self:

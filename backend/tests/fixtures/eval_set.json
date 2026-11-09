@@ -1,0 +1,528 @@
+{
+  "version": "eval-v1",
+  "labelled_by": "agent (Claude Code), 2026-11-09, blind to classifier output",
+  "human_review": "pending: the human must review every label and record disagreements in docs/AI_EVALUATION.md",
+  "notes": "Real ingested items (metadata only: title, feed description <=600 chars, URL). 20 relevant / 20 not relevant. primary_category is the agent's single best label; several items fit two categories. Candidates the agent judged ambiguous were left out (hn 962, 1731, 1798, 1830; github 3984, 4050), so the set is easier than live traffic.",
+  "items": [
+    {
+      "db_item_id": 784,
+      "source": "hn",
+      "title": "We're Measuring Data Center Sustainability Wrong",
+      "description": null,
+      "publisher": "spectrum.ieee.org",
+      "url": "https://spectrum.ieee.org/data-center-sustainability-metrics",
+      "published_at": "2026-02-19T19:37:52+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "sustainability"
+      }
+    },
+    {
+      "db_item_id": 828,
+      "source": "hn",
+      "title": "In Minnesota, a plan for a $4B data center takes root with renewables projects",
+      "description": null,
+      "publisher": "techxplore.com",
+      "url": "https://techxplore.com/news/2025-11-minnesota-farm-country-billion-center.html",
+      "published_at": "2026-01-02T21:36:48+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "dc-infrastructure"
+      }
+    },
+    {
+      "db_item_id": 298,
+      "source": "hn",
+      "title": "DeepSeek to use 160K+ of Huawei's Ascend 950DT chips at a Mongolia data center",
+      "description": null,
+      "publisher": "bloomberg.com",
+      "url": "https://bloomberg.com/news/articles/2026-09-04/deepseek-plans-big-huawei-ai-chip-order-to-power-new-data-center",
+      "published_at": "2026-09-04T16:07:54+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "ai-compute-gpus"
+      }
+    },
+    {
+      "db_item_id": 650,
+      "source": "hn",
+      "title": "Fire at Dutch NorthC data center, all personnel evacuated in time",
+      "description": null,
+      "publisher": "techzine.eu",
+      "url": "https://techzine.eu/news/infrastructure/141131/fire-at-northc-data-center-all-personnel-evacuated-in-time",
+      "published_at": "2026-05-08T03:16:55+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "security"
+      }
+    },
+    {
+      "db_item_id": 830,
+      "source": "hn",
+      "title": "AI Has Fueled $70B in Data Center M&A Talks This Year",
+      "description": null,
+      "publisher": "bloomberg.com",
+      "url": "https://bloomberg.com/news/articles/2025-12-29/ai-has-fueled-70-billion-in-data-center-m-a-talks-this-year",
+      "published_at": "2026-01-01T00:21:04+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "economics-finance"
+      }
+    },
+    {
+      "db_item_id": 1208,
+      "source": "hn",
+      "title": "A Federal Regulator Wants to Fast-Track AI Data Centers onto the Power Grid",
+      "description": null,
+      "publisher": "gizmodo.com",
+      "url": "https://gizmodo.com/a-federal-regulator-wants-to-fast-track-ai-data-centers-onto-the-power-grid-2000773803",
+      "published_at": "2026-06-19T04:03:21+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "regulation"
+      }
+    },
+    {
+      "db_item_id": 194,
+      "source": "hn",
+      "title": "Texas Continued Data Center Permitting After the Governor's Pause",
+      "description": null,
+      "publisher": "fractracker.org",
+      "url": "https://fractracker.org/2026/10/texas-data-center-permits-after-governor-halt",
+      "published_at": "2026-10-22T00:33:23+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "regulation"
+      }
+    },
+    {
+      "db_item_id": 881,
+      "source": "hn",
+      "title": "Saudi Arabia Backs Elon Musk's XAI with Data Center Deal",
+      "description": null,
+      "publisher": "nytimes.com",
+      "url": "https://nytimes.com/2025/11/19/technology/saudi-arabia-elon-musk-xai.html",
+      "published_at": "2025-11-19T21:57:53+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "hyperscaler-investments"
+      }
+    },
+    {
+      "db_item_id": 3394,
+      "source": "arxiv",
+      "title": "Source Side Mitigation of AI Datacenter Power Fluctuations with a Hybrid Energy Storage System and Residual Differentiable Predictive Control",
+      "description": "The rapid growth of hyperscale AI datacenters introduces structured, workload-driven active-power fluctuations at the point of interconnection. These fluctuations appear to the grid as time-varying disturbance injections that cannot be captured by conventional peak- or average-load representations. To reduce the residual power disturbance before it propagates into the bulk power system, this paper proposes a hybrid energy storage system with differentiable predictive control (HESS-DPC) framework for datacenter-side power smoothing. A workload-driven disturbance model is first established, repr",
+      "publisher": "arXiv",
+      "url": "https://arxiv.org/abs/2606.04869",
+      "published_at": "2026-06-03T19:04:26+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "power-energy"
+      }
+    },
+    {
+      "db_item_id": 3290,
+      "source": "arxiv",
+      "title": "Smart IoT-Based Leak Forecasting and Detection for Energy-Efficient Liquid Cooling in AI Data Centers",
+      "description": "AI data centers which are GPU centric, have adopted liquid cooling to handle extreme heat loads, but coolant leaks result in substantial energy loss through unplanned shutdowns and extended repair periods. We present a proof-of-concept smart IoT monitoring system combining LSTM neural networks for probabilistic leak forecasting with Random Forest classifiers for instant detection. Testing on synthetic data aligned with ASHRAE 2021 standards, our approach achieves 96.5% detection accuracy and 87% forecasting accuracy at 90% probability within plus or minus 30-minute windows. Analysis demonstrat",
+      "publisher": "arXiv",
+      "url": "https://arxiv.org/abs/2512.21801",
+      "published_at": "2025-12-26T04:21:16+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "cooling"
+      }
+    },
+    {
+      "db_item_id": 3232,
+      "source": "arxiv",
+      "title": "The Energy Cost of Execution-Idle in GPU Clusters",
+      "description": "GPUs are becoming a major contributor to data center power, yet unlike CPUs, they can remain at high power even when visible activity is near zero. We call this state execution-idle. Using per-second telemetry from a large academic AI cluster, we characterize execution-idle as a recurring low-activity yet high-power state in real deployments. Across diverse workloads and multiple GPU generations, it accounts for 19.7% of in-execution time and 10.7% of energy. This suggests a need to both reduce the cost of execution-idle and reduce exposure to it. We therefore build two prototypes: one uses au",
+      "publisher": "arXiv",
+      "url": "https://arxiv.org/abs/2604.04745",
+      "published_at": "2026-04-06T20:40:43+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "optimization"
+      }
+    },
+    {
+      "db_item_id": 3215,
+      "source": "arxiv",
+      "title": "DataCenterGym: A Physics-Grounded Simulator for Multi-Objective Data Center Scheduling",
+      "description": "Modern datacenters schedule heterogeneous workloads across geo-distributed sites with diverse compute capacities, electricity prices, and thermal conditions. Compute utilization, heat generation, cooling demand, and energy consumption are tightly coupled, yet most existing schedulers abstract these effects and treat them independently. We present \\textit{DataCenterGym}, a physics-grounded simulation environment for job scheduling in geo-distributed data centers, designed as a reusable testbed for future research. The simulator integrates compute queueing, building thermal dynamics, localized H",
+      "publisher": "arXiv",
+      "url": "https://arxiv.org/abs/2604.15594",
+      "published_at": "2026-04-17T05:58:25+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "optimization"
+      }
+    },
+    {
+      "db_item_id": 3089,
+      "source": "arxiv",
+      "title": "DC-CLM: Extending the WECC Composite Load Model for AI Data Center Dynamics",
+      "description": "The rapid growth of AI-driven data centers is introducing load behaviors that are not explicitly represented in conventional composite load models. This paper presents DC-CLM, a workload-aware extension of the WECC composite load model that incorporates UPS-supported IT demand, mixed motor/VFD cooling loads, auxiliary demand, and training, inference, and idle workload profiles. A rule-based supervisory state machine represents grid, battery, and diesel operating states and captures temporary IT-load isolation and workload-dependent restoration following voltage recovery. The model is implement",
+      "publisher": "arXiv",
+      "url": "https://arxiv.org/abs/2609.22093",
+      "published_at": "2026-08-07T00:38:06+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "power-energy"
+      }
+    },
+    {
+      "db_item_id": 3895,
+      "source": "github",
+      "title": "bitoftech/netbox-dc-digital-twin",
+      "description": "NetBox digital twin of a 32-rack data center (4 rows x 8 racks), seeded via the REST API with device roles, IPAM, cable plant, and power feeds",
+      "publisher": "GitHub",
+      "url": "https://github.com/bitoftech/netbox-dc-digital-twin",
+      "published_at": "2026-10-15T00:21:03+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "optimization"
+      }
+    },
+    {
+      "db_item_id": 124,
+      "source": "ft_tech",
+      "title": "Anthropic strikes $3.4bn deal to generate gas-fired power for data centres",
+      "description": "AI lab bypasses traditional suppliers to secure scarce equipment as demand for energy surges",
+      "publisher": "Financial Times",
+      "url": "https://ft.com/content/41bf5c6a-9735-4f1a-a8e3-2bcccad58ba0?syn-25a6b1a6=1",
+      "published_at": "2026-11-08T16:30:09+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "power-energy"
+      }
+    },
+    {
+      "db_item_id": 79,
+      "source": "semianalysis",
+      "title": "The Chinese AI Infrastructure Boom: Introducing the SemiAnalysis China Datacenter Model",
+      "description": "1,000+ facilities across 60+ operators mapped, built retail-first and flipped by AI, largest hyperscaler leases 1/5 national capacity, 100MW in 12 months, Eastern Data Western Compute",
+      "publisher": "SemiAnalysis",
+      "url": "https://newsletter.semianalysis.com/p/the-chinese-ai-infrastructure-boom",
+      "published_at": "2026-09-25T21:28:22+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "dc-infrastructure"
+      }
+    },
+    {
+      "db_item_id": 64,
+      "source": "dck",
+      "title": "How to Secure Data Centers During the Construction Phase",
+      "description": "Before operations begin, layered defenses at the site and in the supply chain help prevent theft, vandalism, counterfeit gear, and covert endpoints.",
+      "publisher": "Data Center Knowledge",
+      "url": "https://datacenterknowledge.com/physical-security/how-to-secure-data-centers-during-the-construction-phase",
+      "published_at": "2026-10-13T14:30:00+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "security"
+      }
+    },
+    {
+      "db_item_id": 65,
+      "source": "dck",
+      "title": "Virginia Tops AI Data Center Readiness Ranking as Smaller Markets Advance",
+      "description": "TRG DataCenters’ August 2026 ranking places Virginia in the lead, while states with abundant power, low-carbon electricity, and favorable water conditions gain ground.",
+      "publisher": "Data Center Knowledge",
+      "url": "https://datacenterknowledge.com/data-center-site-selection/virginia-tops-ai-data-center-readiness-ranking-as-smaller-markets-advance",
+      "published_at": "2026-10-12T14:30:00+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "site-selection"
+      }
+    },
+    {
+      "db_item_id": 6,
+      "source": "dcd",
+      "title": "Your data center may be halfway to waterless",
+      "description": "How existing data centers can retrofit waterless cooling systems to reduce water consumption, recover waste heat, and improve cooling efficiency",
+      "publisher": "DatacenterDynamics",
+      "url": "https://datacenterdynamics.com/en/whitepapers/your-data-center-may-be-halfway-to-waterless",
+      "published_at": "2026-11-09T16:02:52+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "cooling"
+      }
+    },
+    {
+      "db_item_id": 5,
+      "source": "dcd",
+      "title": "Google's UK data center disruption caused by 'misconfiguration' of systems",
+      "description": "Outage impacted Lloyds Bank, Revolut, Halifax, and delivery services DPD and Royal Mail",
+      "publisher": "DatacenterDynamics",
+      "url": "https://datacenterdynamics.com/en/news/googles-uk-data-center-disruption-caused-by-misconfiguration-of-systems",
+      "published_at": "2026-11-09T17:10:26+05:30",
+      "label": {
+        "is_relevant": true,
+        "primary_category": "security"
+      }
+    },
+    {
+      "db_item_id": 1395,
+      "source": "hn",
+      "title": "Nvidia Board to Probe Spying Case After CEO Admits Affair",
+      "description": null,
+      "publisher": "bloomberg.com",
+      "url": "http://bloomberg.com/news/articles/2026-11-08/nvidia-board-to-probe-spying-case-after-ceo-jensen-huang-admits-infidelity",
+      "published_at": "2026-11-09T04:14:35+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 2104,
+      "source": "hn",
+      "title": "Nvidia Maxwell Architecture",
+      "description": null,
+      "publisher": "developer.nvidia.com",
+      "url": "https://developer.nvidia.com/maxwell-compute-architecture",
+      "published_at": "2026-06-01T21:03:35+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 2129,
+      "source": "hn",
+      "title": "Five giant hyperscalers–and Nvidia–share a surprising trait: female CFOs",
+      "description": null,
+      "publisher": "fortune.com",
+      "url": "https://fortune.com/2026/05/27/ai-cfos-women-hyperscalers-nvidia-meta-microsoft-openai-ipo",
+      "published_at": "2026-05-31T22:06:56+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 2666,
+      "source": "hn",
+      "title": "GPU Memory Allocation Bugs with Nvidia on Linux and Wayland Adventures",
+      "description": null,
+      "publisher": "nickjanetakis.com",
+      "url": "https://nickjanetakis.com/blog/gpu-memory-allocation-bugs-with-nvidia-on-linux-and-wayland-adventures",
+      "published_at": "2026-01-06T19:57:34+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 2221,
+      "source": "hn",
+      "title": "Nvidia releases Nemotron 3 Nano Omni multimodal model",
+      "description": null,
+      "publisher": "blogs.nvidia.com",
+      "url": "https://blogs.nvidia.com/blog/nemotron-3-nano-omni-multimodal-ai-agents",
+      "published_at": "2026-04-30T13:08:10+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 2214,
+      "source": "hn",
+      "title": "The Man Who Built NVIDIA [audio]",
+      "description": null,
+      "publisher": "econtalk.org",
+      "url": "https://econtalk.org/the-man-who-built-nvidia-with-stephen-witt",
+      "published_at": "2026-05-03T00:52:12+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 2400,
+      "source": "hn",
+      "title": "Nvidia Is Planning to Launch an Open-Source AI Agent Platform",
+      "description": null,
+      "publisher": "wired.com",
+      "url": "https://wired.com/story/nvidia-planning-ai-agent-platform-launch-open-source",
+      "published_at": "2026-03-15T09:24:17+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 1635,
+      "source": "hn",
+      "title": "Nvidia AI Agent Safety Stack",
+      "description": null,
+      "publisher": "blogs.nvidia.com",
+      "url": "https://blogs.nvidia.com/blog/ai-security-agent-stack",
+      "published_at": "2026-09-28T20:24:33+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 1809,
+      "source": "hn",
+      "title": "Perplexity Launches Portable Computer Agent Optimized for Nvidia DGX Spark",
+      "description": null,
+      "publisher": "blogs.nvidia.com",
+      "url": "https://blogs.nvidia.com/blog/local-ai-open-source-models-agents-nemotron",
+      "published_at": "2026-08-25T21:00:07+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 2593,
+      "source": "hn",
+      "title": "AI Engineering: Pi 5 x K8s x Nvidia GPU passthrough [video]",
+      "description": null,
+      "publisher": "youtube.com",
+      "url": "https://youtube.com/shorts/3W_t9fJ1R1Q",
+      "published_at": "2026-01-20T02:14:11+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 3951,
+      "source": "github",
+      "title": "kc4ums/rf_baseline_observer",
+      "description": "RTL-SDR ham band noise floor monitor for Windows 11. Sweeps 10m–23cm, logs per-band interference data as JSON for trend analysis.",
+      "publisher": "GitHub",
+      "url": "https://github.com/kc4ums/rf_baseline_observer",
+      "published_at": "2026-02-23T00:51:20+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 3809,
+      "source": "github",
+      "title": "api-evangelist/power-lattice",
+      "description": "Power Lattice — independent third-party profile of a public API surface, by API Evangelist. Power Lattice (Powerlattice) is a semiconductor and power-management startup building power delivery solutions for AI accelerators and GPUs. Its core product is an industry-first power delivery chiplet that integrates voltage regulation directly into the pro",
+      "publisher": "GitHub",
+      "url": "https://github.com/api-evangelist/power-lattice",
+      "published_at": "2026-08-01T10:19:03+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 3832,
+      "source": "github",
+      "title": "api-evangelist/frore-systems",
+      "description": "Frore Systems — independent third-party profile of a public API surface, by API Evangelist. Frore Systems is a Silicon Valley thermal-management company that develops solid-state active cooling technology for high-performance computing in space-constrained devices. Its flagship AirJet solid-state cooling chips (AirJet Mini and AirJet PAK families)",
+      "publisher": "GitHub",
+      "url": "https://github.com/api-evangelist/frore-systems",
+      "published_at": "2026-07-27T07:15:50+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 101,
+      "source": "nyt_tech",
+      "title": "Tech Billionaires Face Tricky Political Waters After Democratic Midterm Sweep",
+      "description": "Many donated money to President Trump’s favored causes and became his allies. Now that political alignment may be a liability.",
+      "publisher": "The New York Times",
+      "url": "https://nytimes.com/2026/11/05/technology/tech-billionaires-democrats-midterms.html",
+      "published_at": "2026-11-06T06:03:00+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 112,
+      "source": "ft_tech",
+      "title": "US stocks set for gains after AI rout",
+      "description": "Declines last week pushed many indices into bear market territory",
+      "publisher": "Financial Times",
+      "url": "https://ft.com/content/b8644327-86e7-4d1c-a71f-3fb1d552723b?syn-25a6b1a6=1",
+      "published_at": "2026-11-09T18:43:28+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 116,
+      "source": "ft_tech",
+      "title": "Mark Blyth: ‘I call it the barbell from hell’",
+      "description": "The political economist on AI",
+      "publisher": "Financial Times",
+      "url": "https://ft.com/content/92bcf6f9-619c-4f24-82ea-425984d3ecaf?syn-25a6b1a6=1",
+      "published_at": "2026-11-09T12:00:04+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 4556,
+      "source": "dcd",
+      "title": "Vodafone Ireland targets 70% 5G Standalone coverage by 2028",
+      "description": "Set to trial the network in Limerick and Shannon first",
+      "publisher": "DatacenterDynamics",
+      "url": "https://datacenterdynamics.com/en/news/vodafone-ireland-targets-70-5g-standalone-coverage-by-2028",
+      "published_at": "2026-11-09T19:10:31+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 126,
+      "source": "ft_tech",
+      "title": "Is Europe getting serious about ending tech dependence?",
+      "description": "Brussels is moving in the right direction but could push national governments further",
+      "publisher": "Financial Times",
+      "url": "https://ft.com/content/bd763f67-4c23-4e55-8fbf-3ca0ed520175?syn-25a6b1a6=1",
+      "published_at": "2026-11-08T10:30:19+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 127,
+      "source": "ft_tech",
+      "title": "Apple saves $2.7bn in taxes by booking profits in Singapore",
+      "description": "City-state overtakes Ireland as iPhone maker’s biggest tax shelter according to new disclosures",
+      "publisher": "Financial Times",
+      "url": "https://ft.com/content/49453406-99f2-4f5b-8f5d-01dc8cac5ede?syn-25a6b1a6=1",
+      "published_at": "2026-11-08T10:30:11+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    },
+    {
+      "db_item_id": 19,
+      "source": "dcd",
+      "title": "Deutsche Telekom CEO welcomes SpaceX terrestrial challenge, warns it will cost Musk at least $200bn",
+      "description": "Tim Höttges says \"welcome to the party\"",
+      "publisher": "DatacenterDynamics",
+      "url": "https://datacenterdynamics.com/en/news/deutsche-telekom-ceo-welcomes-spacex-terrestrial-challenge-warns-it-will-cost-musk-at-least-200bn",
+      "published_at": "2026-11-06T20:25:11+05:30",
+      "label": {
+        "is_relevant": false,
+        "primary_category": null
+      }
+    }
+  ]
+}

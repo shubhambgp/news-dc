@@ -20,6 +20,16 @@ class Settings(BaseSettings):
     relevance_threshold: int = 55
     quality_threshold: int = 40
     max_llm_items_per_run: int = 300
+    # Phase 3 AI pipeline (§11.5). Prices are per million tokens for CLASSIFIER_MODEL; copy them
+    # from the provider's pricing page. 0 = unknown, so the daily USD limit cannot trigger.
+    classifier_effort: str = "low"  # output_config.effort; empty = omit (models without effort)
+    classifier_input_usd_per_mtok: float = 0.0
+    classifier_output_usd_per_mtok: float = 0.0
+    daily_llm_budget_usd: float = 5.0
+    llm_concurrency: int = 5
+    llm_timeout_seconds: float = 60.0
+    near_duplicate_threshold: float = 0.92
+    job_lease_seconds: int = 600
     github_token: str = ""
     log_level: str = "INFO"
     # Repo-root config/ (categories.yaml, sources.yaml). In the container this resolves to /config.

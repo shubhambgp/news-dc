@@ -37,3 +37,13 @@ def engine():
     seed(eng, get_settings().config_dir)
     yield eng
     eng.dispose()
+
+
+@pytest.fixture(autouse=True)
+def no_real_llm(monkeypatch):
+    """Tests never make a paid call, even with a real ANTHROPIC_API_KEY in .env."""
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("a test tried to call the real Anthropic API")
+
+    monkeypatch.setattr("anthropic.resources.messages.Messages.create", refuse)

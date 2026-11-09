@@ -259,3 +259,8 @@ def test_disabled_or_unknown_sources_are_refused(engine):
         ingest_source("register_dc", engine=engine)
     with pytest.raises(ValueError, match="unknown"):
         ingest_source("nope", engine=engine)
+
+
+def test_ingest_all_stops_between_sources_on_shutdown(engine):
+    assert ingest_all(engine=engine, should_stop=lambda: True) == []
+    assert _q(engine, "SELECT count(*) FROM pipeline_runs")[0][0] == 0

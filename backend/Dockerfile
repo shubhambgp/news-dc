@@ -14,7 +14,7 @@ COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY . .
 
-RUN useradd --create-home --uid 10001 app
+RUN useradd --create-home --uid 10001 app && mkdir /models && chown app /models  # fastembed cache volume
 USER app
 
 EXPOSE 8000

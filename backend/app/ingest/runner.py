@@ -343,9 +343,19 @@ def ingest_source(
 
 
 def ingest_all(
-    *, since_days: int | None = None, trigger: str = "schedule", engine: Engine | None = None
+    *,
+    since_days: int | None = None,
+    trigger: str = "schedule",
+    engine: Engine | None = None,
+    should_stop: Callable[[], bool] = lambda: False,
 ) -> list[RunResult]:
-    """Every enabled source in turn; each records its own success or failure."""
+    """Every enabled source in turn; each records its own success or failure.
+    `should_stop` is checked between sources (worker shutdown)."""
     with Session(engine or db.engine) as s:
         keys = s.scalars(select(Source.key).where(Source.enabled).order_by(Source.id)).all()
-    return [ingest_source(k, since_days=since_days, trigger=trigger, engine=engine) for k in keys]
+    results = []
+    for k in keys:
+        if should_stop():
+            break
+        results.append(ingest_source(k, since_days=since_days, trigger=trigger, engine=engine))
+    return results

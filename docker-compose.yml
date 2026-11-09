@@ -42,6 +42,14 @@ services:
     <<: *backend
     command: ["python", "-m", "app.worker"]
     init: true  # forward SIGTERM so `docker compose down` stops it promptly
+    stop_grace_period: 60s  # let the running job reach a safe point and release itself
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-newsdc}:${POSTGRES_PASSWORD:-newsdc}@db:5432/${POSTGRES_DB:-newsdc}
+      FASTEMBED_CACHE_PATH: /models  # embedding model survives restarts
+    volumes:
+      - ./backend:/app
+      - ./config:/config:ro
+      - models:/models
 
   frontend:
     build: ./frontend
@@ -58,3 +66,4 @@ services:
 
 volumes:
   pgdata:
+  models:

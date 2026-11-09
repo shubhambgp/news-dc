@@ -1,28 +1,141 @@
 """Worker entrypoint: `python -m app.worker`.
 
-Phase 0 only starts the scheduler process so the container lifecycle can be exercised.
-Ingestion and pipeline jobs are registered in Phase 2/3.
+APScheduler enqueues an `ingest_all` job every INGEST_INTERVAL_MINUTES (immediately on start).
+The main loop claims jobs from the `jobs` table (app/jobs.py) and runs them; a finished ingest
+queues a `pipeline` job. Several worker replicas are safe: claims use SKIP LOCKED, one active job
+per kind is enforced by the database, and the pipeline itself holds an advisory lock.
+
+Shutdown (SIGTERM/SIGINT): stop claiming, let the running job stop at its next safe point (between
+sources / between pages of items), and hand it back as `pending` without spending an attempt.
+Compose gives the worker a 60 s grace period; if it is killed anyway, the job's lease expires and
+another worker reclaims it.
 """
 
 import logging
+import os
+import signal
+import socket
+import threading
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 
+from app import db, jobs
+from app.ai.llm import LLMError
 from app.config import get_settings
+from app.ingest.runner import ingest_all
 from app.logging import setup_logging
+from app.models import Job
+from app.pipeline.graph import run_pipeline
 
 log = logging.getLogger("app.worker")
+
+WORKER_ID = f"{socket.gethostname()}:{os.getpid()}"
+POLL_SECONDS = 5.0
+HEARTBEAT_SECONDS = 60.0
+
+
+class Interrupted(Exception):
+    """The job stopped early because the worker is shutting down."""
+
+
+def handle(job: Job, stop: threading.Event) -> None:
+    trigger = job.payload.get("trigger", "schedule")
+    if job.kind == "ingest_all":
+        ingest_all(
+            trigger=trigger, should_stop=stop.is_set
+        )  # source errors are recorded per source
+        if stop.is_set():
+            raise Interrupted
+        jobs.enqueue(db.engine, "pipeline", {"trigger": trigger})
+    elif job.kind == "pipeline":
+        result = run_pipeline(trigger=trigger, should_stop=stop.is_set)
+        if result.status == "failed":
+            error = result.error or "pipeline failed"
+            raise RuntimeError(error) if result.retryable else jobs.PermanentJobError(error)
+        if result.stop_reason == "shutdown requested":
+            raise Interrupted
+    else:
+        raise jobs.PermanentJobError(f"no handler for job kind {job.kind!r}")
+
+
+def run_job(job: Job, stop: threading.Event) -> str:
+    ctx: dict[str, Any] = {"job_id": job.id, "kind": job.kind, "attempt": job.attempt_count}
+    beating = threading.Event()
+
+    def beat() -> None:
+        while not beating.wait(HEARTBEAT_SECONDS):
+            if not jobs.heartbeat(db.engine, job.id, WORKER_ID):
+                log.warning("lost the job lease", extra=ctx)
+
+    threading.Thread(target=beat, daemon=True).start()
+    log.info("job started", extra=ctx)
+    try:
+        handle(job, stop)
+    except Interrupted:
+        jobs.release(db.engine, job, WORKER_ID)
+        outcome = "released"
+    except (jobs.PermanentJobError, LLMError) as exc:
+        permanent = isinstance(exc, jobs.PermanentJobError) or not exc.retryable
+        outcome = jobs.fail(db.engine, job, WORKER_ID, str(exc), permanent=permanent)
+        log.error("job failed", extra=ctx | {"error": str(exc)[:300], "outcome": outcome})
+    except Exception as exc:
+        outcome = jobs.fail(db.engine, job, WORKER_ID, f"{type(exc).__name__}: {exc}")
+        log.exception("job failed", extra=ctx | {"outcome": outcome})
+    else:
+        jobs.complete(db.engine, job, WORKER_ID)
+        outcome = "succeeded"
+    finally:
+        beating.set()
+    log.info("job finished", extra=ctx | {"outcome": outcome})
+    return outcome
+
+
+def schedule_ingest(interval_minutes: int) -> None:
+    try:
+        job_id = jobs.enqueue(
+            db.engine,
+            "ingest_all",
+            {"trigger": "schedule"},
+            not_within=timedelta(minutes=interval_minutes * 0.9),  # other replicas' ticks
+        )
+        log.info("scheduled ingest", extra={"job_id": job_id, "queued": job_id is not None})
+    except Exception:  # the DB may be down; the next tick tries again
+        log.exception("could not enqueue ingest job")
 
 
 def main() -> None:
     settings = get_settings()
     setup_logging(settings.log_level)
-    scheduler = BlockingScheduler(timezone="UTC")
-    log.info("worker started", extra={"jobs": len(scheduler.get_jobs())})
-    try:
-        scheduler.start()
-    except (KeyboardInterrupt, SystemExit):
-        log.info("worker stopped")
+    stop = threading.Event()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(sig, lambda *_: stop.set())
+
+    scheduler = BackgroundScheduler(timezone="UTC")
+    scheduler.add_job(
+        schedule_ingest,
+        "interval",
+        minutes=settings.ingest_interval_minutes,
+        args=[settings.ingest_interval_minutes],
+        next_run_time=datetime.now(UTC),
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.start()
+    log.info("worker started", extra={"worker_id": WORKER_ID})
+    while not stop.is_set():
+        try:
+            job = jobs.claim(db.engine, WORKER_ID)
+        except Exception:
+            log.exception("claim failed")
+            job = None
+        if job is None:
+            stop.wait(POLL_SECONDS)
+            continue
+        run_job(job, stop)
+    scheduler.shutdown(wait=False)
+    log.info("worker stopped")
 
 
 if __name__ == "__main__":

@@ -44,6 +44,10 @@ ITEM_STATUSES = (
 CONTENT_TYPES = ("news", "research", "investment", "engineering")
 RUN_TRIGGERS = ("schedule", "admin", "cli")
 RUN_STATUSES = ("running", "succeeded", "partial", "failed")
+RUN_KINDS = ("ingest", "pipeline")
+JOB_KINDS = ("ingest_all", "pipeline")
+JOB_STATUSES = ("pending", "running", "succeeded", "retry_wait", "dead_letter", "cancelled")
+JOB_ACTIVE = ("pending", "running", "retry_wait")
 
 
 def _in(col: str, values: tuple[str, ...]) -> str:
@@ -124,6 +128,7 @@ class Item(Base):
         CheckConstraint(
             "comments_count IS NULL OR comments_count >= 0", name="comments_count_nonneg"
         ),
+        CheckConstraint("ai_attempts >= 0", name="ai_attempts_nonneg"),
         Index("ix_items_published_at_id", text("published_at DESC"), text("id DESC")),
         Index("ix_items_status", "status"),
         Index("ix_items_content_hash", "content_hash"),
@@ -174,6 +179,10 @@ class Item(Base):
         ),
     )
     embedding: Mapped[Any | None] = mapped_column(Vector(EMBEDDING_DIM))  # NULL = not embedded yet
+    # AI pipeline bookkeeping (§11.5): failed classification attempts, and why the item has its
+    # current status (pre-filter/gate rejection reason, last LLM error, pending embedding).
+    ai_attempts: Mapped[int] = mapped_column(SmallInteger, server_default=text("0"))
+    status_reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
 
@@ -254,6 +263,7 @@ class AIAnnotation(Base):
     tokens_in: Mapped[int | None] = mapped_column(Integer)
     tokens_out: Mapped[int | None] = mapped_column(Integer)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
+    attempts: Mapped[int | None] = mapped_column(SmallInteger)  # LLM calls, incl. a repair retry
     cost_usd_estimate: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
@@ -266,6 +276,7 @@ class PipelineRun(Base):
     __table_args__ = (
         CheckConstraint(_in("trigger", RUN_TRIGGERS), name="trigger_valid"),
         CheckConstraint(_in("status", RUN_STATUSES), name="status_valid"),
+        CheckConstraint(_in("kind", RUN_KINDS), name="kind_valid"),
         CheckConstraint(
             "fetched >= 0 AND new >= 0 AND duplicates >= 0 AND rejected_prefilter >= 0 "
             "AND rejected_ai >= 0 AND processed >= 0 AND failed >= 0",
@@ -277,6 +288,7 @@ class PipelineRun(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    kind: Mapped[str] = mapped_column(String(16), server_default="ingest")
     trigger: Mapped[str] = mapped_column(String(16))
     source_key: Mapped[str | None] = mapped_column(String(64))  # NULL = all sources
     status: Mapped[str] = mapped_column(String(16), server_default="running")
@@ -289,6 +301,41 @@ class PipelineRun(Base):
     failed: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     cost_usd_estimate: Mapped[Decimal] = mapped_column(Numeric(10, 4), server_default=text("0"))
     error: Mapped[str | None] = mapped_column(Text)
+    # Why a pipeline run stopped early (LLM item cap, daily spend limit, shutdown); shown in Admin.
+    stop_reason: Mapped[str | None] = mapped_column(Text)
+
+
+class Job(Base):
+    """Durable job lifecycle (§11.4). APScheduler only enqueues; workers claim with SKIP LOCKED."""
+
+    __tablename__ = "jobs"
+    __table_args__ = (
+        CheckConstraint(_in("kind", JOB_KINDS), name="kind_valid"),
+        CheckConstraint(_in("status", JOB_STATUSES), name="status_valid"),
+        CheckConstraint("attempt_count >= 0 AND max_attempts > 0", name="attempts_valid"),
+        Index("ix_jobs_status_next_retry_at", "status", "next_retry_at"),
+        # At most one active job per kind: duplicate schedules from several replicas no-op.
+        Index(
+            "uq_jobs_one_active_per_kind",
+            "kind",
+            unique=True,
+            postgresql_where=text(_in("status", JOB_ACTIVE)),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    status: Mapped[str] = mapped_column(String(16), server_default="pending")
+    attempt_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    max_attempts: Mapped[int] = mapped_column(Integer, server_default=text("3"))
+    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    locked_by: Mapped[str | None] = mapped_column(Text)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = _created()
+    updated_at: Mapped[datetime] = _updated()
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class TrendBrief(Base):

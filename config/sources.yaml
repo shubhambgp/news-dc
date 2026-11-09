@@ -72,6 +72,7 @@ sources:
   # --- RSS: headline, summary and link only. DCD, DCK, NYT and FT block Anthropic crawlers in
   # robots.txt, so their article pages are never fetched. ---
   - key: dcd
+    dc_specific: true
     name: DatacenterDynamics
     type: rss
     endpoint_or_feed_url: https://www.datacenterdynamics.com/en/rss/
@@ -83,6 +84,7 @@ sources:
     backfill_window_days: 30
     attribution_label: DatacenterDynamics
   - key: dck
+    dc_specific: true
     name: Data Center Knowledge
     type: rss
     endpoint_or_feed_url: https://www.datacenterknowledge.com/rss.xml
