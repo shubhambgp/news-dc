@@ -44,12 +44,18 @@ class SourceConfig(_Strict):
     max_requests_per_minute: int = Field(gt=0, le=600)
     backfill_window_days: int = Field(gt=0, le=3650)
     attribution_label: str = Field(min_length=1)
+    # Search queries for API sources (hackernews, arxiv, github). RSS feeds take none.
+    queries: list[str] = Field(default_factory=list)
+    # Per-run cap on fetched rows; a capped backfill resumes from its checkpoint next run.
+    max_items_per_run: int = Field(default=1000, gt=0, le=10000)
 
     @model_validator(mode="after")
     def _enabled_needs_terms(self) -> Self:
         # PLAN §11.6: a source is enabled only after its terms have been checked.
         if self.enabled and self.terms_url is None:
             raise ValueError(f"source {self.key!r} is enabled but has no terms_url")
+        if self.enabled and self.type != "rss" and not self.queries:
+            raise ValueError(f"source {self.key!r} is enabled but has no queries")
         return self
 
 

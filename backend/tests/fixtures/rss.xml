@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Example DC News</title>
+    <link>https://news.example.com/</link>
+    <description>Fixture feed</description>
+    <item>
+      <title>Operator opens 100 MW liquid-cooled campus</title>
+      <link>https://news.example.com/en/news/liquid-cooled-campus/?utm_source=rss</link>
+      <guid isPermaLink="false">dc-1001</guid>
+      <description><![CDATA[<p>A <b>100 MW</b> campus.</p><script>alert('x')</script>]]></description>
+      <dc:creator>Jane Writer</dc:creator>
+      <category>Cooling</category>
+      <pubDate>Mon, 09 Nov 2026 12:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Utility signs nuclear PPA for data center load</title>
+      <link>https://news.example.com/en/news/nuclear-ppa/</link>
+      <guid isPermaLink="false">dc-1002</guid>
+      <description>Grid power for AI.</description>
+      <pubDate>Sun, 08 Nov 2026 09:30:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Item with an unusable link</title>
+      <link>javascript:alert(1)</link>
+      <guid isPermaLink="false">dc-1003</guid>
+      <pubDate>Sun, 08 Nov 2026 08:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Very old story</title>
+      <link>https://news.example.com/en/news/old/</link>
+      <guid isPermaLink="false">dc-0001</guid>
+      <pubDate>Mon, 01 Jan 2018 00:00:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>

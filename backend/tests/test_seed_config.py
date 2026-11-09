@@ -12,9 +12,24 @@ def test_repo_config_is_valid():
     categories = load_categories(CONFIG / "categories.yaml")
     assert len(categories) == 14
     assert categories[0].slug == "dc-infrastructure"
-    sources = load_sources(CONFIG / "sources.yaml")
-    # Nothing is enabled until Phase 2 verifies terms/robots (PLAN §11.6).
-    assert sources and not any(s.enabled for s in sources)
+    sources = {s.key: s for s in load_sources(CONFIG / "sources.yaml")}
+    enabled = {k for k, s in sources.items() if s.enabled}
+    # Verified in Phase 2 (docs/SOURCE_REGISTER.md); robots.txt default-deny keeps two disabled.
+    assert enabled == {
+        "hn",
+        "arxiv",
+        "github",
+        "dcd",
+        "dck",
+        "sth",
+        "semianalysis",
+        "nyt_tech",
+        "ft_tech",
+    }
+    assert not sources["register_dc"].enabled and not sources["nextplatform"].enabled
+    # Paywalled / AI-crawler-blocking publishers never get full-text extraction.
+    for key in ("dcd", "dck", "semianalysis", "nyt_tech", "ft_tech", "arxiv", "github"):
+        assert "content_text" not in sources[key].allowed_fields
 
 
 def _write(tmp_path, data):
@@ -53,11 +68,19 @@ def test_enabled_source_requires_terms_url(tmp_path):
         {"key": "Bad Key"},
         {"max_requests_per_minute": 0},
         {"unexpected": 1},
+        {"max_items_per_run": 0},
     ],
 )
 def test_invalid_source_rejected(tmp_path, change):
     with pytest.raises(ValidationError):
         load_sources(_write(tmp_path, {"sources": [SOURCE | change]}))
+
+
+def test_enabled_api_source_requires_queries(tmp_path):
+    api = SOURCE | {"type": "hackernews", "enabled": True, "terms_url": "https://example.com/t"}
+    with pytest.raises(ValidationError, match="no queries"):
+        load_sources(_write(tmp_path, {"sources": [api]}))
+    assert load_sources(_write(tmp_path, {"sources": [api | {"queries": ["data center"]}]}))
 
 
 def test_duplicate_keys_rejected(tmp_path):

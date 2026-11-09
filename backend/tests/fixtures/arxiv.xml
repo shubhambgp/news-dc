@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom">
+  <title>arXiv Query</title>
+  <opensearch:totalResults>3</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <opensearch:itemsPerPage>100</opensearch:itemsPerPage>
+  <entry>
+    <id>http://arxiv.org/abs/2611.01234v2</id>
+    <published>2026-11-05T10:00:00Z</published>
+    <updated>2026-11-06T10:00:00Z</updated>
+    <title>Carbon-Aware Scheduling for
+      Hyperscale Data Centers</title>
+    <summary>  We study scheduling of batch jobs across data center regions.  </summary>
+    <author><name>A. Researcher</name></author>
+    <author><name>B. Scientist</name></author>
+    <link href="http://arxiv.org/abs/2611.01234v2" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2611.01234v2" rel="related" type="application/pdf"/>
+    <category term="cs.DC" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="eess.SY" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2610.09999v1</id>
+    <published>2026-10-20T10:00:00Z</published>
+    <updated>2026-10-20T10:00:00Z</updated>
+    <title>Thermal Models of Immersion-Cooled Racks</title>
+    <summary>Immersion cooling model.</summary>
+    <author><name>C. Engineer</name></author>
+    <link href="http://arxiv.org/abs/2610.09999v1" rel="alternate" type="text/html"/>
+    <category term="cs.AR" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2001.00001v1</id>
+    <published>2020-01-01T10:00:00Z</published>
+    <updated>2020-01-01T10:00:00Z</updated>
+    <title>An Old Paper</title>
+    <summary>Too old for the window.</summary>
+    <author><name>D. Old</name></author>
+    <category term="cs.DC" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+</feed>

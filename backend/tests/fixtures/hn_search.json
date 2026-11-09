@@ -1,0 +1,24 @@
+{
+  "hits": [
+    {
+      "objectID": "45000001",
+      "title": "Inside a 1 GW AI data center",
+      "url": "https://blog.example.org/posts/1gw-ai-dc?utm_medium=hn",
+      "author": "alice",
+      "points": 312,
+      "num_comments": 140,
+      "created_at_i": 1762600000,
+      "story_text": null
+    },
+    {
+      "objectID": "45000002",
+      "title": "Ask HN: How do you plan data center power?",
+      "url": null,
+      "author": "bob",
+      "points": 25,
+      "num_comments": 31,
+      "created_at_i": 1762500000,
+      "story_text": "<p>We are sizing &amp; planning.</p>"
+    }
+  ]
+}

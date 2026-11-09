@@ -1,40 +1,163 @@
 # Ingestion sources (PLAN §11.6). Seeded into the `sources` table on backend startup (upsert by key).
 # This file is administrator-controlled and is the source of truth for every field, including `enabled`.
 #
-# Every source is disabled until Phase 2 checks its endpoint, terms and robots policy and records them
-# in docs/SOURCE_REGISTER.md. The loader refuses `enabled: true` without a `terms_url`.
-# RSS feeds are added in Phase 2, once each feed URL has been verified to work.
+# Every endpoint, terms page and robots.txt below was checked on 2026-11-09; details are in
+# docs/SOURCE_REGISTER.md. The loader refuses `enabled: true` without a `terms_url`.
+#
+# allowed_fields: what we store from the source. `content_text` means full-text extraction of the
+# linked page is attempted, and only if that page's robots.txt allows NewsDC, ClaudeBot and
+# anthropic-ai (extracted text is sent to Claude in Phase 3) and the host is not a hard paywall.
 sources:
   - key: hn
     name: Hacker News (Algolia API)
     type: hackernews
     endpoint_or_feed_url: https://hn.algolia.com/api/v1/search_by_date
-    enabled: false
-    terms_url: null
-    robots_policy: unverified
-    allowed_fields: [title, url, author, created_at, points, num_comments, story_id]
-    max_requests_per_minute: 30
+    enabled: true
+    terms_url: https://hn.algolia.com/api
+    robots_policy: "Public JSON API (hn.algolia.com/robots.txt is 404). Linked articles: per-site robots.txt checked before extraction."
+    allowed_fields: [title, url, author, created_at, points, num_comments, story_id, story_text, content_text]
+    max_requests_per_minute: 60
     backfill_window_days: 365
     attribution_label: Hacker News
+    max_items_per_run: 4000
+    # Title-only phrase searches (quoted); unquoted short terms like "PUE" match thousands of
+    # unrelated titles through prefix/typo matching.
+    queries:
+      - data center
+      - datacenter
+      - data centre
+      - hyperscaler
+      - liquid cooling
+      - immersion cooling
+      - GPU cluster
+      - power grid
+      - colocation
+      - SMR
+      - AI infrastructure
+      - nvidia
   - key: arxiv
     name: arXiv API
     type: arxiv
     endpoint_or_feed_url: https://export.arxiv.org/api/query
-    enabled: false
-    terms_url: null
-    robots_policy: unverified
+    enabled: true
+    terms_url: https://info.arxiv.org/help/api/tou.html
+    robots_policy: "export.arxiv.org/robots.txt disallows crawling; the API Terms of Use explicitly permit API access at <= 1 request / 3 s. Abstract pages are not crawled."
     allowed_fields: [title, summary, authors, published, id, categories, pdf_link]
-    max_requests_per_minute: 20  # plan: at least 3 s between calls
+    max_requests_per_minute: 20  # terms: at most one request every 3 s
     backfill_window_days: 365
     attribution_label: arXiv
+    max_items_per_run: 1500
+    queries:
+      - 'abs:"data center" AND (cat:cs.DC OR cat:cs.AR OR cat:cs.NI OR cat:eess.SY)'
+      - 'abs:datacenter AND (cat:cs.DC OR cat:cs.AR OR cat:cs.NI OR cat:eess.SY)'
   - key: github
     name: GitHub repository search
     type: github
     endpoint_or_feed_url: https://api.github.com/search/repositories
-    enabled: false
-    terms_url: null
-    robots_policy: unverified
-    allowed_fields: [full_name, html_url, description, topics, stargazers_count, pushed_at, owner]
+    enabled: true
+    terms_url: https://docs.github.com/en/site-policy/github-terms/github-terms-of-service
+    robots_policy: "Official REST API; 10 search requests/min unauthenticated, 30 with GITHUB_TOKEN."
+    allowed_fields: [full_name, html_url, description, topics, stargazers_count, created_at, owner]
     max_requests_per_minute: 10
     backfill_window_days: 365
     attribution_label: GitHub
+    max_items_per_run: 2000
+    queries:
+      - topic:datacenter
+      - topic:data-center
+      - topic:dcim
+      - topic:gpu-cluster
+      - topic:liquid-cooling
+
+  # --- RSS: headline, summary and link only. DCD, DCK, NYT and FT block Anthropic crawlers in
+  # robots.txt, so their article pages are never fetched. ---
+  - key: dcd
+    name: DatacenterDynamics
+    type: rss
+    endpoint_or_feed_url: https://www.datacenterdynamics.com/en/rss/
+    enabled: true
+    terms_url: https://www.datacenterdynamics.com/en/terms-and-conditions/
+    robots_policy: "Feed path allowed for generic agents; ClaudeBot/anthropic-ai disallowed site-wide, so metadata only."
+    allowed_fields: [title, link, summary, published, guid]
+    max_requests_per_minute: 6
+    backfill_window_days: 30
+    attribution_label: DatacenterDynamics
+  - key: dck
+    name: Data Center Knowledge
+    type: rss
+    endpoint_or_feed_url: https://www.datacenterknowledge.com/rss.xml
+    enabled: true
+    terms_url: https://www.informatechtarget.com/terms-and-conditions
+    robots_policy: "Feed path allowed for generic agents; ClaudeBot/anthropic-ai disallowed, so metadata only."
+    allowed_fields: [title, link, summary, published, author, guid]
+    max_requests_per_minute: 6
+    backfill_window_days: 30
+    attribution_label: Data Center Knowledge
+  - key: sth
+    name: ServeTheHome
+    type: rss
+    endpoint_or_feed_url: https://www.servethehome.com/feed/
+    enabled: true
+    terms_url: https://www.servethehome.com/about/data-processing-and-privacy-policy/
+    robots_policy: "No robots.txt (404 on 2026-11-09). Full-text extraction allowed, re-checked per fetch."
+    allowed_fields: [title, link, summary, published, author, categories, guid, content_text]
+    max_requests_per_minute: 6
+    backfill_window_days: 30
+    attribution_label: ServeTheHome
+  - key: semianalysis
+    name: SemiAnalysis
+    type: rss
+    endpoint_or_feed_url: https://newsletter.semianalysis.com/feed
+    enabled: true
+    terms_url: https://substack.com/tos
+    robots_policy: "Substack robots.txt allows /feed and /p/*. Partly paywalled newsletter: public listing metadata only (the feed's full-content field is ignored)."
+    allowed_fields: [title, link, summary, published, author, guid]
+    max_requests_per_minute: 6
+    backfill_window_days: 60
+    attribution_label: SemiAnalysis
+  - key: nyt_tech
+    name: The New York Times, Technology
+    type: rss
+    endpoint_or_feed_url: https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml
+    enabled: true
+    terms_url: https://www.nytimes.com/rss
+    robots_policy: "rss.nytimes.com has no robots.txt. NYT RSS terms allow personal / non-commercial use with attribution and a link back. Headline + description only; paywalled article pages are never fetched."
+    allowed_fields: [title, link, description, published, guid]
+    max_requests_per_minute: 6
+    backfill_window_days: 30
+    attribution_label: The New York Times
+  - key: ft_tech
+    name: Financial Times, Technology
+    type: rss
+    endpoint_or_feed_url: https://www.ft.com/technology?format=rss
+    enabled: true
+    terms_url: https://help.ft.com/legal-privacy/terms-and-conditions/
+    robots_policy: "/technology allowed for generic agents (crawl-delay 1). Headline + standfirst only; paywalled article pages are never fetched."
+    allowed_fields: [title, link, description, published, guid]
+    max_requests_per_minute: 6
+    backfill_window_days: 30
+    attribution_label: Financial Times
+
+  # --- Disabled after checking: robots.txt denies every unlisted user agent. ---
+  - key: register_dc
+    name: The Register, On-Prem (data centre)
+    type: rss
+    endpoint_or_feed_url: https://www.theregister.com/on_prem/headlines.atom
+    enabled: false
+    terms_url: null
+    robots_policy: "DISALLOWED: robots.txt has `User-agent: *` + `Disallow: /` (default-deny). The plan's data_centre feed URL returns 404."
+    allowed_fields: [title, link, summary, published]
+    max_requests_per_minute: 6
+    backfill_window_days: 30
+    attribution_label: The Register
+  - key: nextplatform
+    name: The Next Platform
+    type: rss
+    endpoint_or_feed_url: https://www.nextplatform.com/feed/
+    enabled: false
+    terms_url: null
+    robots_policy: "DISALLOWED: robots.txt has `User-agent: *` + `Disallow: /` (default-deny)."
+    allowed_fields: [title, link, summary, published]
+    max_requests_per_minute: 6
+    backfill_window_days: 30
+    attribution_label: The Next Platform
