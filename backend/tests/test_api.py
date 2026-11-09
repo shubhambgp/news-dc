@@ -192,6 +192,23 @@ def test_openapi_lists_every_endpoint_and_error_shape():
         "/api/v1/ask/suggestions",
         "/api/v1/trends",
         "/api/v1/stats",
+        "/api/v1/export",
+        "/api/v1/admin/login",
+        "/api/v1/admin/session",
+        "/api/v1/admin/logout",
+        "/api/v1/admin/ingest",
+        "/api/v1/admin/pipeline",
+        "/api/v1/admin/trend-brief",
+        "/api/v1/admin/reprocess-outdated",
+        "/api/v1/admin/items/{item_id}/reprocess",
+        "/api/v1/admin/jobs/{job_id}/retry",
+        "/api/v1/admin/runs",
+        "/api/v1/admin/jobs",
+        "/api/v1/admin/sources",
+        "/api/v1/admin/sources/{key}",
+        "/api/v1/admin/categories",
+        "/api/v1/admin/categories/{slug}",
+        "/api/v1/admin/rejected",
     }
     assert "ErrorResponse" in spec["components"]["schemas"]
     item_responses = spec["paths"]["/api/v1/items/{item_id}"]["get"]["responses"]

@@ -15,12 +15,19 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from starlette.exceptions import HTTPException
 
 from app import __version__, db
-from app.api import ask, feeds, items, search, topics, trends
+from app.api import admin, ask, export, feeds, items, search, topics, trends
 from app.api.common import ApiError
 from app.config import get_settings
 from app.logging import request_id_var, setup_logging
 from app.schemas import ErrorResponse
-from app.security import API_CSP, DEFAULT_LIMIT, RATE_LIMIT_EXEMPT, SECURITY_HEADERS, allow
+from app.security import (
+    API_CSP,
+    CSRF_HEADER,
+    DEFAULT_LIMIT,
+    RATE_LIMIT_EXEMPT,
+    SECURITY_HEADERS,
+    allow,
+)
 from app.seed import seed
 
 log = logging.getLogger("app.main")
@@ -195,8 +202,9 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
-        allow_methods=["GET", "POST"],
-        allow_headers=["Content-Type", "X-Request-ID"],
+        allow_methods=["GET", "POST", "PATCH"],
+        allow_headers=["Content-Type", "X-Request-ID", CSRF_HEADER],
+        allow_credentials=True,  # the admin session cookie (Phase 8); origins are an allow-list
         expose_headers=["X-Request-ID"],
     )
     app.middleware("http")(request_context)
@@ -210,6 +218,9 @@ def create_app() -> FastAPI:
     app.include_router(search.router, prefix=API_PREFIX)
     app.include_router(ask.router, prefix=API_PREFIX)
     app.include_router(trends.router, prefix=API_PREFIX)
+    app.include_router(export.router, prefix=API_PREFIX)
+    app.include_router(admin.public, prefix=API_PREFIX)
+    app.include_router(admin.router, prefix=API_PREFIX, responses=not_found)
     return app
 
 

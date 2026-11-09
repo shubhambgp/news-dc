@@ -156,7 +156,7 @@ class Profile(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid")
 
     category_weights: dict[Slug, Weight] = Field(default_factory=dict, max_length=64)
-    tag_weights: dict[Tag, Weight] = Field(default_factory=dict, max_length=200)
+    tag_weights: dict[Tag, Weight] = Field(default_factory=dict, max_length=100)
     read_ids: list[ItemRef] = Field(default_factory=list, max_length=200)
     bookmark_ids: list[ItemRef] = Field(default_factory=list, max_length=500)
     dismissed_ids: list[ItemRef] = Field(default_factory=list, max_length=500)
@@ -353,3 +353,161 @@ class StatsResponse(BaseModel):
     per_day: list[DayCount] = Field(description="Processed items by publication date, 60 days.")
     pipeline_runs: list[RunOut] = Field(description="The 10 most recent runs.")
     ai_cost: AiCost
+
+
+# --- Export (Phase 8) ---------------------------------------------------------------------------
+
+
+class ExportSource(BaseModel):
+    """Attribution: one source that found the item, with its own link."""
+
+    key: str
+    name: str
+    url: str
+
+
+class ExportRecord(ItemSummary):
+    """One processed item for export: permitted metadata, original link, NewsDC-generated
+    summary/insights. Never the extracted article text (§11.6, §11.13)."""
+
+    key_insights: list[KeyInsight]
+    entities: Entities
+    sources: list[ExportSource]
+
+
+# --- Admin (Phase 8) ----------------------------------------------------------------------------
+
+
+class AdminLogin(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=1, max_length=512)
+
+
+class AdminSessionInfo(BaseModel):
+    csrf_token: str = Field(description="Send it as `X-CSRF-Token` on every admin POST/PATCH.")
+    expires_at: UtcDatetime
+
+
+class JobQueued(BaseModel):
+    job_id: int | None = Field(
+        description="The new job, or null when a job of this kind is already queued or running "
+        "(it will pick up the change)."
+    )
+
+
+class Reprocessed(BaseModel):
+    items: int = Field(description="Items sent back to `new`.")
+    job_id: int | None
+
+
+class IngestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: (
+        Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9_-]*$", max_length=64)] | None
+    ) = Field(default=None, description="Source key; omit for every enabled source.")
+
+
+class AdminSource(BaseModel):
+    key: str
+    name: str
+    type: str
+    url: str
+    enabled: bool = Field(description="From config/sources.yaml (terms reviewed).")
+    admin_disabled: bool = Field(description="Paused in Admin.")
+    active: bool = Field(description="Ingested on the next run: enabled and not paused.")
+    terms_url: str | None
+    last_fetched_at: UtcDatetime | None
+    last_success_at: UtcDatetime | None
+    last_status: str | None
+    last_error: str | None
+
+
+class SourcePatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    active: bool
+
+
+class AdminCategory(BaseModel):
+    slug: str
+    name: str
+    description: str
+    keywords: list[str]
+    enabled: bool
+    sort_order: int
+    admin_edited_at: UtcDatetime | None
+
+
+Keyword = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64)]
+
+
+class CategoryPatch(BaseModel):
+    """Only the fields sent are changed. The next classification run uses them; existing
+    annotations become outdated (POST /admin/reprocess-outdated reclassifies them, paid)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)] | None
+    ) = None
+    description: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+        | None
+    ) = None
+    keywords: list[Keyword] | None = Field(default=None, max_length=50)
+    enabled: bool | None = None
+
+
+class AdminRun(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    kind: str
+    trigger: str
+    source_key: str | None
+    status: str
+    started_at: UtcDatetime
+    finished_at: UtcDatetime | None
+    fetched: int
+    new: int
+    duplicates: int
+    rejected_prefilter: int
+    rejected_ai: int
+    processed: int
+    failed: int
+    cost_usd_estimate: float
+    error: str | None
+    stop_reason: str | None
+
+
+class AdminJob(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    kind: str
+    payload: dict[str, Any]
+    status: str
+    attempt_count: int
+    max_attempts: int
+    next_retry_at: UtcDatetime | None
+    locked_by: str | None
+    last_error: str | None
+    created_at: UtcDatetime
+    finished_at: UtcDatetime | None
+
+
+class RejectedItem(BaseModel):
+    id: int
+    title: str
+    url: str
+    publisher: str | None
+    published_at: UtcDatetime | None
+    status: str
+    reason: str | None = Field(description="Why it was rejected (prefilter, AI or duplicate).")
+    relevance_score: int | None
+    quality_score: int | None
+    duplicate_of: int | None
+    duplicate_similarity: float | None
+    updated_at: UtcDatetime

@@ -87,7 +87,9 @@ class Source(Base):
     name: Mapped[str] = mapped_column(Text)
     type: Mapped[str] = mapped_column(String(32))
     url: Mapped[str] = mapped_column(Text)
-    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))  # YAML-owned
+    # Admin pause (Phase 8). A source is ingested only when `enabled` and not `admin_disabled`.
+    admin_disabled: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     # The rest of the config/sources.yaml entry: terms_url, robots_policy, rate limit, ...
     settings: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     last_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -109,6 +111,8 @@ class Category(Base):
     keywords: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
     enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     sort_order: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    # Set when Admin edits the category (Phase 8); seeding then leaves its text alone.
+    admin_edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
 

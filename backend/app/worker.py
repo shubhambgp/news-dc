@@ -27,7 +27,7 @@ from app.ai import trends
 from app.ai.classify import Prices
 from app.ai.llm import AnthropicLLM, LLMError
 from app.config import get_settings
-from app.ingest.runner import ingest_all
+from app.ingest.runner import ingest_all, ingest_source
 from app.logging import setup_logging
 from app.models import Job
 from app.pipeline.graph import run_pipeline
@@ -46,9 +46,13 @@ class Interrupted(Exception):
 def handle(job: Job, stop: threading.Event) -> None:
     trigger = job.payload.get("trigger", "schedule")
     if job.kind == "ingest_all":
-        ingest_all(
-            trigger=trigger, should_stop=stop.is_set
-        )  # source errors are recorded per source
+        if key := job.payload.get("source"):  # Admin: one source
+            try:
+                ingest_source(key, trigger=trigger)
+            except ValueError as exc:  # unknown, disabled or paused source
+                raise jobs.PermanentJobError(str(exc)) from exc
+        else:  # source errors are recorded per source
+            ingest_all(trigger=trigger, should_stop=stop.is_set)
         if stop.is_set():
             raise Interrupted
         jobs.enqueue(db.engine, "pipeline", {"trigger": trigger})

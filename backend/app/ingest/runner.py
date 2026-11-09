@@ -287,6 +287,8 @@ def ingest_source(
             raise ValueError(f"unknown source {key!r}")
         if not source.enabled:
             raise ValueError(f"source {key!r} is disabled in config/sources.yaml")
+        if source.admin_disabled:
+            raise ValueError(f"source {key!r} is paused in Admin")
         run = PipelineRun(trigger=trigger, source_key=key)
         s.add(run)
         s.commit()
@@ -352,7 +354,9 @@ def ingest_all(
     """Every enabled source in turn; each records its own success or failure.
     `should_stop` is checked between sources (worker shutdown)."""
     with Session(engine or db.engine) as s:
-        keys = s.scalars(select(Source.key).where(Source.enabled).order_by(Source.id)).all()
+        keys = s.scalars(
+            select(Source.key).where(Source.enabled, ~Source.admin_disabled).order_by(Source.id)
+        ).all()
     results = []
     for k in keys:
         if should_stop():

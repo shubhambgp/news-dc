@@ -641,12 +641,36 @@ def _progress(s: Session, run: PipelineRun, deps: Deps, examined: int) -> None:
     s.commit()
 
 
+def current_prompt_hash(engine: Engine) -> str:
+    """Hash of the system prompt the next run would use (template + enabled categories)."""
+    with Session(engine) as s:
+        cats = s.execute(
+            select(Category.slug, Category.name, Category.description)
+            .where(Category.enabled)
+            .order_by(Category.sort_order, Category.slug)
+        ).all()
+    return prompt_hash(build_system_prompt([CategoryRef(*c) for c in cats]))
+
+
+_RESET = {
+    "status": "new",
+    "ai_attempts": 0,
+    "status_reason": None,
+    "duplicate_of": None,
+    "duplicate_similarity": None,
+    "duplicate_reason": None,
+    "updated_at": func.now(),
+}
+
+
 def reprocess_outdated(engine: Engine | None = None) -> int:
-    """Admin/CLI action: send items annotated with an older prompt version back to `new`.
-    The next run classifies them again with the current prompt; their annotation is replaced."""
+    """Admin/CLI action: send items classified with another prompt version, or another prompt
+    hash (an Admin category edit changes the hash, D-035), back to `new`. The next run
+    classifies them again with the current prompt; their annotation is replaced."""
     eng = engine or db.engine
     outdated = select(AIAnnotation.item_id).where(
         AIAnnotation.prompt_version.is_distinct_from(PROMPT_VERSION)
+        | AIAnnotation.prompt_hash.is_distinct_from(current_prompt_hash(eng))
     )
     with Session(eng) as s, s.begin():
         return s.execute(
@@ -654,13 +678,13 @@ def reprocess_outdated(engine: Engine | None = None) -> int:
             .where(
                 Item.id.in_(outdated), Item.status.in_(("processed", "rejected_ai", "duplicate"))
             )
-            .values(
-                status="new",
-                ai_attempts=0,
-                status_reason=None,
-                duplicate_of=None,
-                duplicate_similarity=None,
-                duplicate_reason=None,
-                updated_at=func.now(),
-            )
+            .values(**_RESET)
         ).rowcount  # type: ignore[attr-defined]
+
+
+def reprocess_item(engine: Engine, item_id: int) -> bool:
+    """Admin action: send one item back to `new`, whatever its status. False if it doesn't exist."""
+    with Session(engine) as s, s.begin():
+        return bool(
+            s.execute(update(Item).where(Item.id == item_id).values(**_RESET)).rowcount  # type: ignore[attr-defined]
+        )

@@ -14,7 +14,13 @@ class Settings(BaseSettings):
     # No default model IDs on purpose: they must be verified against provider docs (PLAN 11.5).
     classifier_model: str = ""
     assistant_model: str = ""
+    # Admin (Phase 8, §11.9). Admin is disabled unless ADMIN_TOKEN (≥ 16 chars) and a separate
+    # SESSION_SECRET (≥ 32 chars, signs the session cookie) are both set.
     admin_token: str = ""
+    session_secret: str = ""
+    admin_session_minutes: int = 30
+    rate_limit_admin_login: str = "5/minute"  # per client IP
+    rate_limit_admin_login_global: str = "30/minute"  # all clients together
     cors_origins: str = "http://localhost:5173"  # comma-separated
     ingest_interval_minutes: int = 60
     relevance_threshold: int = 55
@@ -45,6 +51,10 @@ class Settings(BaseSettings):
     rate_limit_default: str = "60/minute"
     # Repo-root config/ (categories.yaml, sources.yaml). In the container this resolves to /config.
     config_dir: Path = Path(__file__).resolve().parents[2] / "config"
+
+    @property
+    def admin_enabled(self) -> bool:
+        return len(self.admin_token) >= 16 and len(self.session_secret) >= 32
 
     @property
     def cors_origin_list(self) -> list[str]:

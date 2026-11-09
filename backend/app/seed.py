@@ -10,7 +10,7 @@ from typing import Literal, Self
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
-from sqlalchemy import Engine, func
+from sqlalchemy import Engine, case, func
 from sqlalchemy.dialects.postgresql import insert
 
 from app.config import get_settings
@@ -102,14 +102,20 @@ def seed(engine: Engine, config_dir: Path) -> tuple[int, int]:
         stmt = insert(Category).values(
             [{**c.model_dump(), "sort_order": i} for i, c in enumerate(categories)]
         )
-        # `enabled` is left alone on conflict: Admin owns it once the row exists.
+        # `enabled` is left alone on conflict: Admin owns it once the row exists. A category
+        # edited in Admin keeps its text too; only its sort order follows the YAML.
+        text_cols = ("name", "description", "keywords")
         conn.execute(
             stmt.on_conflict_do_update(
                 index_elements=[Category.slug],
                 set_={
-                    k: stmt.excluded[k] for k in ("name", "description", "keywords", "sort_order")
+                    k: case(
+                        (Category.admin_edited_at.is_(None), stmt.excluded[k]),
+                        else_=getattr(Category, k),
+                    )
+                    for k in text_cols
                 }
-                | {"updated_at": func.now()},
+                | {"sort_order": stmt.excluded.sort_order, "updated_at": func.now()},
             )
         )
         if sources:
@@ -128,7 +134,8 @@ def seed(engine: Engine, config_dir: Path) -> tuple[int, int]:
                 for s in sources
             ]
             src = insert(Source).values(rows)
-            # The YAML is admin-controlled and authoritative for sources, including `enabled`.
+            # The YAML is authoritative for sources, including `enabled`; the Admin pause
+            # (`admin_disabled`) is a separate column it never touches.
             conn.execute(
                 src.on_conflict_do_update(
                     index_elements=[Source.key],

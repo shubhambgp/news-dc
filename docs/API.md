@@ -2,7 +2,7 @@
 
 Base path: `/api/v1`. The interactive OpenAPI docs are at `/api/v1/docs` and the schema is at `/api/v1/openapi.json`. Request and response models live in `backend/app/schemas.py`.
 
-Every endpoint below is **public** and read-only, and is **rate limited** to `RATE_LIMIT_DEFAULT` (60/minute) per client IP. `/health` and `/ready` are the exceptions: they aren't rate limited. `POST /ask` has an extra limit, `RATE_LIMIT_ASK` (10/minute). `POST /feeds/foryou` and `POST /ask` are the only endpoints that take a request body. Admin endpoints arrive in Phase 8.
+Every endpoint is **rate limited** to `RATE_LIMIT_DEFAULT` (60/minute) per client IP, except `/health` and `/ready`. Everything outside `/admin` is **public** and read-only. `POST /ask` has an extra limit, `RATE_LIMIT_ASK` (10/minute). `/admin/*` is **admin-only** (see [Admin](#admin)). Request bodies are at most 64 KiB.
 
 ## Conventions
 
@@ -74,7 +74,7 @@ The formulas are explained in `docs/ARCHITECTURE.md`. Ties are broken by `publis
 | Field | Limit |
 |---|---|
 | `categoryWeights` | ≤ 64 entries. Keys must be existing category slugs. Values are finite, −1000 to 1000. |
-| `tagWeights` | ≤ 200 entries. Tags are 1–64 characters and are compared case-insensitively. |
+| `tagWeights` | ≤ 100 entries. Tags are 1–64 characters and are compared case-insensitively. |
 | `readIds` | ≤ 200 item IDs, oldest first |
 | `bookmarkIds`, `dismissedIds` | ≤ 500 item IDs each |
 | `explicitTopics` | ≤ 64 category slugs (picked at onboarding) |
@@ -149,6 +149,44 @@ Retrieval: hybrid search (keywords OR-ed, plus the embedding) over the question 
 | `pipeline_runs` | The 10 most recent ingest and pipeline runs with their counts, status, cost, `stop_reason` and `error` |
 | `ai_cost` | `{classifier_usd, classifier_today_usd, trend_brief_usd, total_usd}`. Estimates from token counts and the configured prices. Ask NewsDC answers are logged, not stored, so they are not included |
 
+## Export
+
+`GET /export?format=json|md&limit=&category=&content_type=&source=&min_quality=&from=&to=`: public, rate limited. Downloads the newest `limit` (1–1000, default 500) processed items matching the shared filters, ordered `published_at DESC, id DESC`, as an attachment (`Content-Disposition: attachment; filename="newsdc_export.json|md"`).
+
+- `format=json` (default): `application/json`, an array of records. A record is an `ItemSummary` plus `key_insights`, `entities` and `sources` (`[{key, name, url}]`, every source that found the item, primary first).
+- `format=md`: `text/markdown; charset=utf-8`, one document grouped by primary category (display order, then "Uncategorized"). Each item has a title link, publisher · date · content type, the summary, insights and source links. Titles, summaries and insights are escaped (no raw HTML or Markdown from sources or the model), and only `http(s)` links are emitted.
+
+Exports never contain the extracted article text or the source's description: only metadata, original links, attribution and NewsDC's own summaries and insights (§11.13). `backend/scripts/export_dataset.py` writes the same format to `data/sample/`.
+
+## Admin
+
+Admin is disabled (every `/admin/*` route returns `503 admin_disabled`) unless `ADMIN_TOKEN` (≥ 16 chars) and `SESSION_SECRET` (≥ 32 chars, a different random value) are set.
+
+**Session.** `POST /admin/login` with `{"token": "<ADMIN_TOKEN>"}` returns `{csrf_token, expires_at}` and sets the `newsdc_admin` cookie: `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/admin; Max-Age=ADMIN_SESSION_MINUTES*60` (default 30 minutes). Every login issues a new session ID and CSRF token. Login is limited to `RATE_LIMIT_ADMIN_LOGIN` (5/minute) per IP and `RATE_LIMIT_ADMIN_LOGIN_GLOBAL` (30/minute) for all clients together; a wrong token is `401 unauthorized` with no detail.
+
+Every other admin route needs the cookie (`401 unauthorized` without a valid, unexpired, not-logged-out session). `POST` and `PATCH` also need the `X-CSRF-Token` header (`403 csrf_failed`), and a browser request's `Origin` (or `Referer`) must be the API's own origin or one of `CORS_ORIGINS` (`403 forbidden_origin`). The frontend sends `credentials: "include"`; CORS allows credentials for `CORS_ORIGINS` only.
+
+| Endpoint | Does |
+|---|---|
+| `POST /admin/login` | See above |
+| `GET /admin/session` | `{csrf_token, expires_at}` of the current session (the cookie is httpOnly, so the UI reads the token here after a reload) |
+| `POST /admin/logout` | `204`. Revokes the session and clears the cookie |
+| `POST /admin/ingest` | Body `{"source": "<key>"}` or `{}` for every active source. `202 {job_id}`. Queues an `ingest_all` job; the worker queues a pipeline run when it finishes. `404` unknown source, `409 source_inactive` if disabled in YAML or paused |
+| `POST /admin/pipeline` | `202 {job_id}`. Queues a pipeline run over `new` items (paid; spend limits apply) |
+| `POST /admin/trend-brief` | `202 {job_id}`. Queues a new trend brief. `409 assistant_unavailable` without `ASSISTANT_MODEL` |
+| `POST /admin/reprocess-outdated` | `202 {items, job_id}`. Items classified with another prompt version or prompt hash (e.g. after a category edit) go back to `new`, and a pipeline run is queued (paid) |
+| `POST /admin/items/{id}/reprocess` | `202 {items: 1, job_id}`. One item back to `new`, any status. `404` unknown item |
+| `POST /admin/jobs/{id}/retry` | `200 {job_id}`. A dead-lettered job gets fresh attempts. `409 not_dead_letter` otherwise |
+| `GET /admin/runs` | The last 50 ingest and pipeline runs: counts, status, cost, `error`, `stop_reason` (e.g. a spend limit) |
+| `GET /admin/jobs` | The last 50 jobs with status, attempts, `last_error` |
+| `GET /admin/sources` | Every source: `enabled` (YAML, terms reviewed), `admin_disabled`, `active`, `terms_url`, last fetch/success/status/error |
+| `PATCH /admin/sources/{key}` | `{"active": bool}`. Pauses or resumes a source. Turning on a source that YAML disables is `409 disabled_in_config` |
+| `GET /admin/categories` | Every category with `admin_edited_at` |
+| `PATCH /admin/categories/{slug}` | Any of `name` (1–80), `description` (1–500), `keywords` (≤ 50, each 1–64), `enabled`. The next classification run uses the new text; existing annotations become outdated. Seeding no longer overwrites an edited category's text. Disabling the last enabled category is `409 last_category` |
+| `GET /admin/rejected?status=&page=&page_size=` | Paginated items kept out of the feed (`rejected_prefilter`, `rejected_ai`, `duplicate`), newest decision first, with `reason`, scores and `duplicate_of`/`duplicate_similarity` |
+
+`job_id` is `null` when a job of that kind is already queued or running (one active job per kind); that job picks up the change.
+
 ## Errors
 
 Every non-2xx response has the same shape:
@@ -159,7 +197,10 @@ Every non-2xx response has the same shape:
 
 | Status | `code` | When |
 |---|---|---|
+| 401 | `unauthorized` | Admin route without a valid session, or a wrong admin token |
+| 403 | `csrf_failed`, `forbidden_origin` | Admin `POST`/`PATCH` without the CSRF token, or from a foreign origin |
 | 404 | `not_found` | Unknown route, item or topic |
+| 409 | see [Admin](#admin) | An admin action that conflicts with the current state |
 | 411 | `length_required` | A request body without `Content-Length` |
 | 413 | `payload_too_large` | A request body over 64 KiB |
 | 405 | `method_not_allowed` | Wrong HTTP method |
@@ -167,7 +208,8 @@ Every non-2xx response has the same shape:
 | 429 | `rate_limited` | Over the per-IP limit |
 | 500 | `internal_error` | Unexpected error. No internals are exposed. |
 | 503 | `db_unavailable` | The database is unreachable |
+| 503 | `admin_disabled` | Admin route while `ADMIN_TOKEN`/`SESSION_SECRET` are unset |
 
 ## Response headers
 
-Every response carries `X-Request-ID`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`. API responses also carry `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`. The docs page doesn't, because Swagger UI loads a CDN script. CORS allows only `CORS_ORIGINS` and exposes `X-Request-ID`.
+Every response carries `X-Request-ID`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`. API responses also carry `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`. The docs page doesn't, because Swagger UI loads a CDN script. CORS allows only `CORS_ORIGINS` (with credentials, for the admin cookie), the methods `GET`, `POST`, `PATCH` and the request headers `Content-Type`, `X-Request-ID`, `X-CSRF-Token`, and exposes `X-Request-ID`.
