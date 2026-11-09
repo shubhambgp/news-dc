@@ -805,3 +805,78 @@ Every cited number maps to a real source link (20 of 30 sources cited, check: `a
 - ai_cost after the brief: `{classifier_usd: 1.1292, classifier_today_usd: 1.1292, trend_brief_usd: 0.0627, total_usd: 1.1919}`.
 
 Not run: `docker compose` (no Docker, R-001). CI on GitHub (not pushed).
+
+## Phase 8 (2026-11-09)
+
+Environment: same machine and PostgreSQL 18.6 + pgvector 0.8.1 cluster (port 55433). `newsdc` holds the live data (3,898 items, 2,609 processed); `newsdc_test` is the throwaway pytest database. No Docker. uv is not on PATH, so commands ran with the existing `backend/.venv` binaries (what `uv run` executes); no dependency changes. No LLM calls in this phase.
+
+Acceptance checks (plan Phase 8): admin routes return 401 without the cookie; login is rate limited; exports download and open correctly; tests cover auth and export.
+
+### Automated checks (final state)
+| Command | Result |
+|---|---|
+| `ruff format --check .` | `75 files already formatted` |
+| `ruff check .` | `All checks passed!` |
+| `mypy app` | `Success: no issues found in 42 source files` |
+| `TEST_DATABASE_URL=...newsdc_test pytest -q` | `372 passed` (new: 16 in `test_admin.py`, 12 in `test_admin_db.py`) |
+| `pytest -q` (no DB) | `255 passed, 117 skipped` |
+| `pytest -q tests/test_admin.py tests/test_admin_db.py` (with DB) | `28 passed` |
+| `alembic downgrade 0004` then `upgrade head` on `newsdc_test` | `Running downgrade 0005 -> 0004`, `Running upgrade 0004 -> 0005` |
+| `alembic upgrade head` on `newsdc` | `Running upgrade 0004 -> 0005` |
+
+What the new tests cover:
+- **Auth:** all 15 protected routes return 401 without a cookie. Admin is disabled (503) without `SESSION_SECRET` or with a short token. The cookie carries `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/v1/admin` and `Max-Age=1800`, and never the token or the secret. A wrong token is 401 with no detail. Login is limited per IP (5 → 429, and the correct token is refused too while the limit holds) and globally (30). The login body is validated. `POST` without or with a wrong `X-CSRF-Token` is 403. A foreign `Origin` or `Referer` is 403, while an allowed `CORS_ORIGINS` origin passes. Logout revokes the session, and a copied cookie works before logout but not after. Each login rotates the session. Forged, tampered, unsigned, empty and expired cookies are refused, and a cookie signed with the admin token is refused.
+- **Export:** JSON has processed items only, sources primary first, insights, no `content_text` or `description`, and the download headers. Filters, `limit` bounds and format validation work. Markdown has the download headers and is grouped by category. A `<script>` / `javascript:` title stays escaped text. The escaping and link helpers are unit-tested.
+- **Actions:** ingest all / one source / unknown (404) / YAML-disabled (409). Pipeline queueing with one active job per kind (`job_id: null`). The trend brief needs the assistant (409). The runs list shows `stop_reason`. Jobs list, dead-letter retry, then 409. Reprocess one item, and unknown is 404. Rejected items with reasons and a status filter. Pausing a source survives a re-seed, enabling a YAML-disabled source is 409. A category edit survives a re-seed and makes every classified item outdated (4 reset). Category validation, and the last enabled category can't be disabled (409).
+
+Failures along the way (all fixed):
+- `scripts/export_dataset.py`: `ModuleNotFoundError: No module named 'app'`. Fixed with the same `sys.path` line `eval_classifier.py` uses.
+- `tests/test_admin_db.py`: `import app.db` was shadowed by the FastAPI `app`, so it is now `from app import db as app_db`. Two test expectations were wrong: YAML lists Power before Cooling, and a substring check matched the *escaped* `\<script\>`. Both were fixed in the tests, not the code.
+- `SADeprecationWarning: Result.tuples()` in `export.category_names` turned into a 500 under `-W error`. Removed.
+- `test_openapi_lists_every_endpoint_and_error_shape`: the 17 new paths were added to the pinned list.
+- `markdown-it-py` isn't installed, and adding a dev dependency needs uv, which isn't on PATH here. The Markdown test asserts the escaped output directly instead of rendering it.
+
+### Live checks (uvicorn on :8765 against `newsdc`, final code)
+Throwaway `ADMIN_TOKEN`/`SESSION_SECRET` from `secrets.token_urlsafe`, set in the environment only (not in `.env`). Output verbatim:
+```
+--- no cookie
+runs 401
+jobs 401
+sources 401
+categories 401
+rejected 401
+session 401
+POST pipeline 401
+--- login
+csrf len 43
+cookie path=/api/v1/admin secure=TRUE
+runs 40 pipeline succeeded
+rejected 1289
+  duplicate | title+summary embedding cosine similarity 0.932 > 0.92 with item 163, published within 14 
+  rejected_ai | Personal and espionage story about an Nvidia executive with no data center infrastructure,
+  rejected_prefilter | no data center keywords
+sources [('hn', True), ('arxiv', True), ('github', True), ('dcd', True), ('dck', True), ('sth', True), ('semianalysis', True), ('nyt_tech', True), ('ft_tech', True), ('register_dc', False), ('nextplatform', False)]
+POST without csrf: {"error":{"code":"csrf_failed","message":"missing or invalid X-CSRF-Token","request_id":"3acfad044d2c48728d5df5cf1e464f51"}}
+--- login rate limit (bad token x6)
+401 401 401 401 429 429 
+--- logout 204; after: 401
+```
+The 5th bad attempt already got 429 because the successful login before it counts toward the 5/minute per-IP limit (D-035). `rejected` 1,289 = 52 prefilter + 1,158 AI + 79 duplicates, which matches the Phase 7 funnel.
+
+Export:
+```
+content-disposition: attachment; filename="newsdc_export.json"
+content-type: application/json
+json records 1000 | cats 14 | with sources 1000
+content-disposition: attachment; filename="newsdc_export.md"
+content-type: text/markdown; charset=utf-8
+50                      # "### " item headings for ?format=md&category=cooling&limit=50
+## Data Center Infrastructure … ## Emerging Technologies   # 7 groups (by primary category)
+real 0m0.312s           # ?format=md&limit=1000
+```
+The JSON parsed with `json.load`. No actions that queue paid jobs were run on the live DB.
+
+### Sample dataset
+`python scripts/export_dataset.py` → `wrote 1000 records to /home/shubham/Documents/news-dc/data/sample/newsdc_sample.json and newsdc_sample.md` (exit 0). The JSON is 1,481,854 bytes and the Markdown 828,277 bytes. A `json.load` check found 1000 records, the fields listed in API.md, and no `content_text` key.
+
+Not run: `docker compose` (no Docker, R-001), so the non-root frontend Dockerfile change hasn't been built. CI on GitHub (not pushed). Rendering the Markdown in a browser or editor: pending human verification.

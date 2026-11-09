@@ -143,3 +143,18 @@ Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
 | Found and fixed: publishers listed as rising companies | Agent | Live `/trends`; unit test; D-034 |
 | Docs: API.md, ARCHITECTURE.md, AI_CONFIG.md, DECISIONS D-034, CHANGELOG, CLAUDE.md | Agent | Pending human review |
 | Read the live brief in VERIFICATION_LOG and judge whether it is faithful to its cited sources and useful | Human | **Pending human verification** |
+
+
+## Phase 8: Admin, security & export
+
+| Task | Done by | How verified |
+|---|---|---|
+| Re-read Phase 8, §11.5, §11.6, §11.7, §11.9, §11.11, §11.13 and D-027/D-033/D-034 deferrals; inspected security, main, jobs, worker, seed, pipeline and API code | Agent | n/a |
+| Admin session (stdlib HMAC cookie, `SESSION_SECRET`, rotation, logout revocation, expiry), CSRF token + origin check, login rate limits per IP and global | Agent | `test_admin.py` (16); live curl run. Pending human verification |
+| Admin actions: ingest all/one, pipeline, trend brief, reprocess outdated/one item, dead-letter retry, runs, jobs, sources pause/resume, category edit, rejected items | Agent | `test_admin_db.py` (12); live read-only calls on real data |
+| Migration 0005 (`sources.admin_disabled`, `categories.admin_edited_at`); seed keeps admin edits; worker one-source ingest | Agent | Migration round trip; re-seed tests |
+| Outdated = other prompt version or prompt hash (category edits) | Agent | `test_edit_category_survives_seed_and_outdates_annotations` |
+| `GET /export` (JSON/Markdown, escaped, http(s) links only, no article text) and `scripts/export_dataset.py`; committed `data/sample/` (1,000 records) | Agent | `test_admin.py`, `test_admin_db.py`; live downloads; script output. Pending human verification of the Markdown rendering |
+| Hardening: profile tags ≤ 100, CORS credentials/PATCH/CSRF header, non-root frontend dev image, `.env.example`, `docs/SECURITY.md` | Agent | Tests; frontend image **not built** (no Docker) |
+| Docs: API.md, SECURITY.md, DECISIONS D-035, RISKS R-018, CHANGELOG, CLAUDE.md | Agent | Pending human review |
+| Try admin login and the actions with a real `ADMIN_TOKEN`/`SESSION_SECRET`; open the exported Markdown and JSON | Human | **Pending human verification** |

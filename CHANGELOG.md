@@ -4,6 +4,26 @@ All notable changes, grouped by build phase. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 8: Admin, security & export (2026-11-09)
+
+#### Added
+- Admin auth (`backend/app/api/admin.py`, `backend/app/security.py`): `POST /api/v1/admin/login` checks `ADMIN_TOKEN` in constant time and sets an HMAC-signed `HttpOnly; Secure; SameSite=Strict` session cookie (signed with a separate `SESSION_SECRET`, 30-minute expiry, new session and CSRF token on every login). `GET /admin/session` and `POST /admin/logout` (revokes the session) are added too. Every other admin route returns 401 without a session. `POST`/`PATCH` need `X-CSRF-Token` and an allowed Origin/Referer. Login is rate limited to 5/minute per IP and 30/minute globally. Admin is disabled (503) without a ≥ 16-char token and a ≥ 32-char secret.
+- Admin actions: queue ingestion (all sources or one), a pipeline run or a trend brief; reprocess outdated items or one item; retry a dead-lettered job. Admin views: the last 50 runs and jobs, sources (pause/resume), categories (edit name/description/keywords/enabled), rejected items with reasons (paginated, filter by status).
+- `GET /api/v1/export?format=json|md` with the shared item filters and `limit` ≤ 1000, served as an attachment. Markdown is grouped by category and escaped, with http(s) links only. The export never includes article text.
+- `backend/scripts/export_dataset.py` and the committed sample `data/sample/newsdc_sample.json` / `.md` (1,000 records).
+- Migration `0005`: `sources.admin_disabled`, `categories.admin_edited_at`.
+- Settings / `.env.example`: `SESSION_SECRET`, `ADMIN_SESSION_MINUTES`, `RATE_LIMIT_ADMIN_LOGIN`, `RATE_LIMIT_ADMIN_LOGIN_GLOBAL`.
+- `docs/SECURITY.md` (controls, tests, secret rotation, what Phases 9/10 add).
+- Tests: `tests/test_admin.py` (16, no DB) and `tests/test_admin_db.py` (12, real Postgres).
+
+#### Changed
+- Seeding no longer overwrites the text of a category edited in Admin. It never touches the Admin pause on sources (D-035).
+- "Outdated" annotations (reprocess) now also include a different prompt hash, so a category edit marks existing classifications outdated (D-035).
+- The `ingest_all` job takes an optional `source` key.
+- CORS allows credentials, `PATCH` and `X-CSRF-Token` (origins are still the `CORS_ORIGINS` allow-list).
+- The For You profile allows ≤ 100 `tagWeights` (was 200), as Phase 8 specifies.
+- The frontend dev image runs as the `node` user.
+
 ### Phase 7: Emerging trends and dashboard data (2026-11-09)
 
 #### Added
