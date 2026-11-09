@@ -13,6 +13,21 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: newsdc
+          POSTGRES_PASSWORD: newsdc
+          POSTGRES_DB: newsdc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U newsdc -d newsdc_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      # Throwaway DB for the integration tests in tests/test_db.py (its schema is dropped).
+      TEST_DATABASE_URL: postgresql+psycopg://newsdc:newsdc@localhost:5432/newsdc_test
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

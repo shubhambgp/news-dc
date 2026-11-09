@@ -9,6 +9,7 @@ x-backend: &backend
     DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-newsdc}:${POSTGRES_PASSWORD:-newsdc}@db:5432/${POSTGRES_DB:-newsdc}
   volumes:
     - ./backend:/app
+    - ./config:/config:ro  # categories.yaml / sources.yaml (app.config.config_dir resolves to /config)
   depends_on:
     db:
       condition: service_healthy
@@ -32,7 +33,8 @@ services:
 
   backend:
     <<: *backend
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    # Migrate first; the app seeds categories/sources on startup.
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
     ports:
       - "127.0.0.1:8000:8000"
 
