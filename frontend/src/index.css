@@ -53,7 +53,7 @@
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
+    --primary: oklch(0.48 0.17 256);
     --primary-foreground: oklch(0.985 0 0);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
@@ -64,7 +64,7 @@
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --ring: oklch(0.55 0.17 256);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -87,8 +87,8 @@
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
+    --primary: oklch(0.74 0.13 250);
+    --primary-foreground: oklch(0.17 0.02 256);
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);
@@ -122,3 +122,15 @@
     @apply bg-background text-foreground;
     }
 }
+
+/* Untrusted Markdown (answers, trend brief): plain, readable typography. */
+.prose-news { @apply space-y-3 text-[15px] leading-relaxed; }
+.prose-news h1, .prose-news h2, .prose-news h3 { @apply mt-4 font-semibold; }
+.prose-news ul { @apply list-disc space-y-1 pl-5; }
+.prose-news ol { @apply list-decimal space-y-1 pl-5; }
+.prose-news a { @apply text-primary underline underline-offset-2; }
+.prose-news code { @apply rounded bg-muted px-1 font-mono text-sm; }
+.prose-news blockquote { @apply border-l-2 pl-3 text-muted-foreground; }
+
+/* Native <dialog>: no default border colour or padding surprises. */
+dialog::backdrop { background: rgb(0 0 0 / 0.4); }
