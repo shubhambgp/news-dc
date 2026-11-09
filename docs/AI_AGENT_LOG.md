@@ -39,3 +39,21 @@ Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
 | Compose (migrate on start, config mount) and CI Postgres service | Agent | compose-spec and GitHub workflow schema validation, actionlint. **Runtime BLOCKED** (no Docker; not pushed). Pending human verification |
 | Docs and logs | Agent | Manual review. Pending human verification |
 
+
+## Phase 2: Ingestion
+
+Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
+
+| Task | Done by | How it was verified |
+|---|---|---|
+| Re-read Phase 2, §11.2, §11.3, §11.4, §11.6, §11.12, §13 | Agent | n/a |
+| Checked every source URL (plan list plus replacements), robots.txt and terms page | Agent | `curl` status codes, `urllib.robotparser` evaluation, feed parsing (VERIFICATION_LOG). **Human review of terms pending**, especially NYT's non-commercial clause |
+| `config/sources.yaml` (9 enabled, 2 disabled by robots.txt) and `docs/SOURCE_REGISTER.md` | Agent | Config tests; live runs of every enabled source. Pending human verification |
+| `common.py`: `RawItem`, guarded `Http` (SSRF, redirects, size cap, throttle, retries), `Robots`, `extract_article` | Agent | 31 unit tests (`test_ingest_common.py`); live runs. Pending human verification |
+| Adapters: `hackernews`, `rss`, `arxiv`, `github` | Agent | 9 fixture tests (`test_ingest_adapters.py`); live 365-day backfill. Pending human verification |
+| Runner: dedupe, enrichment, upsert, provenance, per-source isolation, checkpoints, run records | Agent | 9 DB integration tests (`test_ingest_db.py`); two live full runs with counts compared. Pending human verification |
+| CLI `python -m app.ingest` | Agent | Used for every live run; exit code 1 when a source failed (observed). Pending human verification |
+| Bug found in live run: `304` treated as redirect (`KeyError: 'location'`) | Agent | Seen on the second DCD run. Fixed; regression test |
+| Bug found in live backfill: transaction held open during enrichment → `IdleInTransactionSessionTimeout` on arXiv and GitHub | Agent | Seen in backfill run 1. Fixed; regression test confirmed failing before the fix and passing after; arXiv and GitHub re-run successfully |
+| Docs: CHANGELOG, DECISIONS D-016 to D-023, RISKS R-009 to R-012, README, CLAUDE.md, this log, VERIFICATION_LOG, PHASE_STATUS | Agent | Manual review. Pending human verification |
+| Diff review and commit | Agent | `git diff --stat`, `git status`, secret grep before commit |

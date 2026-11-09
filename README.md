@@ -2,7 +2,7 @@
 
 AI-powered discovery platform for Data Center news and research.
 
-> Status: **Phase 1 (database schema & config)**. See [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) and [plan.md](plan.md) for the build plan.
+> Status: **Phase 2 (ingestion)**. See [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) and [plan.md](plan.md) for the build plan.
 
 ## Quick start (Docker)
 
@@ -25,7 +25,9 @@ cd backend
 uv sync
 uv run alembic upgrade head                # create/upgrade the schema (needs pgvector in Postgres)
 uv run uvicorn app.main:app --reload       # http://localhost:8000
-uv run python -m app.worker                # scheduler process (no jobs until Phase 2/3)
+uv run python -m app.ingest --all --since-days 365   # backfill every enabled source
+uv run python -m app.ingest --source hn              # one source; default window = since last success
+uv run python -m app.worker                # scheduler process (jobs are registered in Phase 3)
 
 # frontend
 cd frontend
@@ -46,7 +48,15 @@ cd frontend && pnpm lint --deny-warnings && pnpm typecheck && pnpm build
 
 ```
 backend/   FastAPI app (app/), Alembic migrations (alembic/), tests, uv project
-config/    categories.yaml (14 categories) and sources.yaml, seeded into the DB on startup
+config/    categories.yaml (14 categories) and sources.yaml (verified sources), seeded into the DB on startup
 frontend/  React 19 + Vite + TypeScript + Tailwind + shadcn/ui
 docs/      logs, decisions, risks, phase status
 ```
+
+## Ingestion
+
+Sources live in `config/sources.yaml`; each one was checked for a working endpoint, terms and robots.txt
+(see [docs/SOURCE_REGISTER.md](docs/SOURCE_REGISTER.md)). Adapters are in `backend/app/ingest/`
+(`hackernews`, `rss`, `arxiv`, `github`). The runner (`runner.py`) dedupes by canonical-URL hash in the
+database, records each source's provenance in `item_sources`, writes one `pipeline_runs` row per source,
+and checkpoints progress so an interrupted backfill resumes. One failing source never stops the others.

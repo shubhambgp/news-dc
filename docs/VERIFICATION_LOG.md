@@ -110,3 +110,92 @@ Failures fixed along the way:
 ### Not verified (BLOCKED)
 - `docker compose up --build` with the new migrate-then-serve command and the `./config` mount: no Docker on this machine. Manual command: `docker compose up --build`, then `docker compose exec db psql -U newsdc -c "select count(*) from categories"` should print 14.
 - CI on GitHub, including the integration tests on `pgvector/pgvector:pg16`: not pushed.
+
+## Phase 2 (2026-11-09)
+
+Environment: same machine, no Docker, no sudo. A fresh throwaway PostgreSQL 18.6 + pgvector 0.8.1 cluster was started in the session scratch directory, the same way as in Phase 1 (`initdb`, port 55433, TCP only, `unix_socket_directories=''` because the scratch path exceeds the 107-byte socket limit). `CREATE EXTENSION vector; SELECT '[1,2]'::vector` returned `[1,2]`. Databases: `newsdc` (live ingestion) and `newsdc_test` (pytest; its schema gets dropped). The backend venv was the existing `backend/.venv`; uv 0.13.7 came from the Phase 0 session copy.
+
+### Source verification (all on 2026-11-09)
+| Check | Result |
+|---|---|
+| `curl -L` each candidate feed/API with a `NewsDC/1.0` UA | 200: DCD `/en/rss/`, DCK `/rss.xml`, STH `/feed/`, `newsletter.semianalysis.com/feed`, `semianalysis.com/feed/`, NYT Technology, FT `technology?format=rss`, HN Algolia, arXiv, GitHub. **404: `theregister.com/data_centre/headlines.atom`** (and `.rss`). 200: `theregister.com/on_prem/headlines.atom` |
+| feedparser entry counts | DCD 20, DCK 50, STH 6, SemiAnalysis newsletter 20, semianalysis.com 10 (newest 2025-09-16, a stale archive), NYT 26, FT 25 |
+| `urllib.robotparser`, UA `NewsDC`, feed and article paths | DCD ✓, DCK ✓, SemiAnalysis ✓, NYT ✓, FT ✓ (crawl-delay 1). **Register ✗, Next Platform ✗** (`User-agent: *` / `Disallow: /`). `export.arxiv.org` ✗ (`Disallow: /`; API use is governed by the API ToU instead) |
+| robots.txt AI-crawler entries | DCD, DCK, NYT and FT disallow `ClaudeBot`/`anthropic-ai` (with GPTBot, CCBot etc.) |
+| Terms pages (HTTP 200) | hn.algolia.com/api, info.arxiv.org/help/api/tou.html, GitHub ToS, DCD terms, informatechtarget.com terms (DCK), STH data/privacy policy (no ToS page found), substack.com/tos, nytimes.com/rss, help.ft.com terms. NYT RSS text: "personal use in a news reader or as part of a non-commercial blog" |
+| arXiv ToU text | "no more than one request every three seconds, and limit requests to a single connection" |
+| GitHub search docs | "For unauthenticated requests, the rate limit allows you to make up to 10 requests per minute"; 30 with auth |
+| HN query sizing (365 days, `nbHits`) | unquoted `PUE` 32,975; quoted+title `"PUE"` 0. `data center` 2,489 unquoted vs 753 quoted+title. `"nvidia"` title 1,590. `"datacenter"` 137, `"AI infrastructure"` 127, `"liquid cooling"` 5 |
+| arXiv query sizing | `abs:"data center" AND (cat:cs.DC OR cat:cs.AR OR cat:cs.NI OR cat:eess.SY)`: 1,615 total, 100 papers between 2026-08-31 and 2026-11-06. One probe was answered `429 Rate exceeded` after a quick burst, so retries are needed |
+
+### Automated checks (final state)
+| Command | Result |
+|---|---|
+| `uv lock --check` | `Resolved 112 packages` (no dependency changes) |
+| `uv run ruff format --check .` | `26 files already formatted` |
+| `uv run ruff check .` | `All checks passed!` |
+| `uv run mypy app` | `Success: no issues found in 16 source files` |
+| `TEST_DATABASE_URL=...newsdc_test uv run pytest -q` | `105 passed` (31 URL, 31 ingest common, 9 adapters, 9 ingest DB integration, 12 DB, 10 config, 3 health) |
+| `uv run pytest -q -rs` (no DB) | `84 passed, 21 skipped` |
+| Secret grep over `backend/app`, `backend/tests`, `config` | no matches (only the fake `test-token` in a test) |
+
+Failures along the way (all fixed):
+- `mypy`: `RobotFileParser` has no `allow_all`/`disallow_all` attributes (undocumented). Replaced with `parse([])` / `parse(["User-agent: *", "Disallow: /"])`. Two typing fixes in the runner.
+- `test_ingest_common`: three failures because the test's `Sleeps` helper is a `list`. An empty one is falsy, so `sleep or time.sleep` silently used real sleep (the run took 15.9 s). Changed to `time.sleep if sleep is None else sleep` (0.37 s afterwards).
+- `test_ingest_db`: two wrong expectations in my own tests (the invalid fixture row is counted as failed on every run; a URL-encoded query string). Tests fixed, no code change.
+
+### Live ingestion: bugs found and fixed
+| Run | What happened | Fix |
+|---|---|---|
+| `python -m app.ingest --source dcd`, twice | 1st: `fetched 20, new 20`. 2nd: `status failed`, `last_error = KeyError: 'location'` | The feed answered `304`. httpx 0.28's `is_redirect` is true for every 3xx. Switched to `has_redirect_location`; regression test `test_not_modified_is_returned_not_followed`. Re-run: `succeeded`, `fetched 0` (304) |
+| Backfill run 1 (`--all --since-days 365`, 18:47–19:00 IST) | hn `succeeded` (2,869 fetched / 2,481 new). **arxiv and github `failed`**: `psycopg.errors.IdleInTransactionSessionTimeout ... [SQL: SAVEPOINT sa_savepoint_1]`. The RSS sources after them still ran and succeeded. CLI exit code `1` | The page's read transaction stayed open while about 100 new items were enriched (HN lookups throttled to 60/min, so about 100 s, past the 60 s idle-in-transaction limit). The runner now commits before enrichment. Regression test `test_no_transaction_is_held_open_during_enrichment` (checks `pg_stat_activity`): **fails without the fix (`[1] == [0]`), passes with it**. Run 1 also showed the failed run reporting `fetched: 100` for a rolled-back page, so failed runs now report only committed pages (test `test_failure_mid_run_keeps_committed_pages_and_cursor`) |
+
+Backfill run 1 used the code before those two fixes and the httpx log-level change. The adapter, dedupe and upsert logic was otherwise identical.
+
+### Acceptance 1: at least 1,500 raw items (365-day backfill)
+Backfill run 1 plus the arXiv and GitHub re-runs with the fixed code (`--source arxiv --since-days 365`: `fetched 510, new 499, duplicates 11`; `--source github --since-days 365`: `fetched 819, new 759, duplicates 60`; both `succeeded`):
+
+| Source | Items first found by this source (`is_primary`) | Items this source observed (incl. shared) |
+|---|---|---|
+| hn | 2,481 | 2,484 |
+| arxiv | 499 | 502 |
+| github | 759 | 759 |
+| dcd | 21 | 21 |
+| dck | 50 | 50 |
+| sth | 6 | 6 |
+| semianalysis | 20 | 20 |
+| nyt_tech | 26 | 26 |
+| ft_tech | 25 | 25 |
+| **Total unique items** | **3,887** | `item_sources` rows: 3,893 |
+
+- **3,887 unique items ≥ 1,500: PASS.** All have `status = 'new'`; no synthetic records.
+- 6 items were found by more than one source (provenance attached, not duplicated). 917 items have extracted full text (HN-linked pages and STH, robots permitting), 939 have a resolved URL, and 42 non-HN items link to a matching HN discussion.
+- Whether **500+ remain after AI filtering** can only be measured in Phase 3. HN volume is dominated by `"nvidia"` titles, many of them off-topic (D-018).
+
+### Acceptance 2: running ingestion twice creates zero duplicate rows
+Second full run, `python -m app.ingest --all --since-days 365` (same window), exit code `0`:
+
+| Source | fetched | new | duplicates | failed | status |
+|---|---|---|---|---|---|
+| hn | 2,870 | 1 | 2,869 | 0 | succeeded |
+| arxiv | 510 | 0 | 510 | 0 | succeeded |
+| github | 820 | 1 | 819 | 0 | succeeded |
+| dcd | 20 | 5 | 15 | 0 | succeeded |
+| dck | 50 | 0 | 50 | 0 | succeeded |
+| sth | 0 (304) | 0 | 0 | 0 | succeeded |
+| semianalysis | 0 (304) | 0 | 0 | 0 | succeeded |
+| nyt_tech | 26 | 0 | 26 | 0 | succeeded |
+| ft_tech | 25 | 1 | 24 | 0 | succeeded |
+
+- Items 3,887 → 3,895 and `item_sources` 3,893 → 3,901. The 8 new rows were all **published after their source's previous run** (DCD's previous run started 13:30 UTC; its 5 new stories are dated 13:33–13:46 UTC; the HN, FT and GitHub items are dated 13:43–13:50 UTC), so they are new content, not duplicates.
+- Duplicate checks after the second run: canonical URLs appearing more than once **0**; `(source_id, external_id)` pairs appearing more than once **0**. Engagement on known items was refreshed in place.
+- **PASS.** Also covered by `test_running_twice_creates_no_duplicate_rows` and `test_concurrent_runs_do_not_duplicate` (three simultaneous runs).
+
+### Acceptance 3: one broken source doesn't stop the others
+- **Live evidence (unplanned):** in backfill run 1, arxiv and github failed. dcd, dck, sth, semianalysis, nyt_tech and ft_tech still ran and succeeded. The error was stored on the source row (`sources.last_status = 'error'`, `last_error = 'InternalError: (psycopg.errors.IdleInTransactionSessionTimeout) ...'`) and on the `pipeline_runs` row (`status failed`). It was logged as JSON `ingest failed` with the traceback and `source_key`.
+- **Automated:** `test_one_broken_source_does_not_stop_the_others` (DCD answers 500 after retries; DCK still ingests; DCD's row has `last_status = error` and `HTTP 500` in `last_error`).
+- **PASS.**
+
+### Not verified (BLOCKED)
+- Ingestion inside `docker compose` (`docker compose run --rm worker python -m app.ingest --all --since-days 365`): no Docker on this machine.
+- CI on GitHub: not pushed.
