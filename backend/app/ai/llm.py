@@ -7,6 +7,7 @@ Retry-After. Whatever still fails is mapped to an `LLMError` that says whether t
 """
 
 import time
+from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -44,6 +45,19 @@ class LLMClient(Protocol):
     ) -> LLMResponse: ...
 
 
+class ChatLLM(Protocol):
+    """Streaming text generation (the assistant, Phase 6)."""
+
+    model: str
+
+    def stream_text(
+        self, *, system: str, messages: list[MessageParam], max_tokens: int
+    ) -> Generator[str | LLMResponse, None, None]:
+        """Yields text deltas, then exactly one LLMResponse (full text, stop reason, usage).
+        Closing the generator early closes the upstream HTTP stream."""
+        ...
+
+
 class AnthropicLLM:
     def __init__(
         self,
@@ -56,7 +70,7 @@ class AnthropicLLM:
     ) -> None:
         if not api_key or not model:
             raise LLMError(
-                "ANTHROPIC_API_KEY and CLASSIFIER_MODEL must be set", retryable=False, fatal=True
+                "ANTHROPIC_API_KEY and a model ID must be set", retryable=False, fatal=True
             )
         self.model = model
         self.effort = effort
@@ -86,32 +100,56 @@ class AnthropicLLM:
                 messages=messages,
                 output_config=output_config,
             )
-        except (
-            anthropic.AuthenticationError,
-            anthropic.PermissionDeniedError,
-            anthropic.NotFoundError,
-        ) as exc:
-            raise LLMError(_describe(exc), retryable=False, fatal=True) from exc
-        except anthropic.BadRequestError as exc:
-            raise LLMError(_describe(exc), retryable=False) from exc
-        except anthropic.APIStatusError as exc:  # 429/5xx left over after the SDK's retries
-            raise LLMError(
-                _describe(exc),
-                retryable=exc.status_code in (408, 409, 429) or exc.status_code >= 500,
-            ) from exc
-        except anthropic.APIConnectionError as exc:  # includes APITimeoutError
-            raise LLMError(_describe(exc), retryable=True) from exc
-        u = r.usage
-        return LLMResponse(
-            text="".join(b.text for b in r.content if b.type == "text"),
-            model=r.model,
-            stop_reason=r.stop_reason,
-            input_tokens=u.input_tokens,
-            output_tokens=u.output_tokens,
-            cache_read_tokens=u.cache_read_input_tokens or 0,
-            cache_write_tokens=u.cache_creation_input_tokens or 0,
-            latency_ms=int((time.monotonic() - started) * 1000),
-        )
+        except anthropic.APIError as exc:
+            raise _llm_error(exc) from exc
+        return _response(r, started)
+
+    def stream_text(
+        self, *, system: str, messages: list[MessageParam], max_tokens: int
+    ) -> Generator[str | LLMResponse, None, None]:
+        blocks: list[TextBlockParam] = [
+            {"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}
+        ]
+        extra: dict[str, Any] = {"output_config": {"effort": self.effort}} if self.effort else {}
+        started = time.monotonic()
+        try:
+            with self.client.messages.stream(
+                model=self.model, max_tokens=max_tokens, system=blocks, messages=messages, **extra
+            ) as stream:
+                yield from stream.text_stream
+                final = stream.get_final_message()
+        except anthropic.APIError as exc:
+            raise _llm_error(exc) from exc
+        yield _response(final, started)
+
+
+def _response(r: Any, started: float) -> LLMResponse:
+    u = r.usage
+    return LLMResponse(
+        text="".join(b.text for b in r.content if b.type == "text"),
+        model=r.model,
+        stop_reason=r.stop_reason,
+        input_tokens=u.input_tokens,
+        output_tokens=u.output_tokens,
+        cache_read_tokens=u.cache_read_input_tokens or 0,
+        cache_write_tokens=u.cache_creation_input_tokens or 0,
+        latency_ms=int((time.monotonic() - started) * 1000),
+    )
+
+
+def _llm_error(exc: anthropic.APIError) -> LLMError:
+    if isinstance(
+        exc,
+        anthropic.AuthenticationError | anthropic.PermissionDeniedError | anthropic.NotFoundError,
+    ):
+        return LLMError(_describe(exc), retryable=False, fatal=True)
+    if isinstance(exc, anthropic.BadRequestError):
+        return LLMError(_describe(exc), retryable=False)
+    if isinstance(exc, anthropic.APIStatusError):  # 429/5xx left over after the SDK's retries
+        status = exc.status_code
+        return LLMError(_describe(exc), retryable=status in (408, 409, 429) or status >= 500)
+    # APIConnectionError (incl. timeouts), or an error event inside a stream
+    return LLMError(_describe(exc), retryable=True)
 
 
 def _describe(exc: Exception) -> str:

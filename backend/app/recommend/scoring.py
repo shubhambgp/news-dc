@@ -49,6 +49,22 @@ def personal(
     )
 
 
+def ask_rank(
+    retrieval: float, relevance: int, quality: int, age_hours: float, recent: bool
+) -> float:
+    """Ask NewsDC re-ranking (Phase 6). `retrieval` is 1 - position/25 of the item in the hybrid
+    search results (1.0 for the best hit). Normal questions: 0.5·retrieval + 0.2·relevance +
+    0.15·quality + 0.15·freshness. Questions about recent news ("latest", "this month") move
+    weight from retrieval and relevance to freshness: 0.35 / 0.15 / 0.15 / 0.35."""
+    w_retrieval, w_relevance, w_fresh = (0.35, 0.15, 0.35) if recent else (0.5, 0.2, 0.15)
+    return (
+        w_retrieval * retrieval
+        + w_relevance * relevance / 100
+        + 0.15 * quality / 100
+        + w_fresh * freshness(age_hours)
+    )
+
+
 # --- SQL bindings ------------------------------------------------------------------------------
 
 

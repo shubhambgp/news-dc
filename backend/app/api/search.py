@@ -4,7 +4,7 @@ model is unavailable (§11.5)."""
 
 import html
 import logging
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, or_, text
@@ -58,6 +58,41 @@ def render_snippet(headline: str) -> str:
     return html.escape(headline).replace(_START, "<mark>").replace(_STOP, "</mark>")
 
 
+def hybrid(
+    db: Session, embedder: Embedder, tsq: Any, text_for_embedding: str, filters: Filters
+) -> tuple[list[tuple[int, float]], Literal["hybrid", "keyword"]]:
+    """Public item ids ranked by RRF over full-text (`tsq`) and embedding similarity. Without an
+    embedding (model unavailable) it degrades to keyword-only (§11.5)."""
+    doc = Item.tsv.op("||")(AIAnnotation.summary_tsv)
+    keyword_ids = list(
+        db.scalars(
+            apply_filters(base(Item.id), filters)
+            .where(or_(Item.tsv.op("@@")(tsq), AIAnnotation.summary_tsv.op("@@")(tsq)))
+            .order_by(func.ts_rank_cd(doc, tsq).desc(), Item.id.desc())
+            .limit(CANDIDATES)
+        )
+    )
+    try:
+        vec = embedder.embed(text_for_embedding)
+    except Exception as exc:  # degrade to keyword search, never fail the request
+        log.warning("search embedding failed; keyword only", extra={"error": type(exc).__name__})
+        return rrf(keyword_ids), "keyword"
+    distance = Item.embedding.cosine_distance(vec)
+    db.execute(text("SET LOCAL hnsw.iterative_scan = relaxed_order"))
+    semantic_ids = list(
+        db.scalars(
+            apply_filters(base(Item.id), filters)
+            .where(
+                Item.embedding.is_not(None),
+                distance < 1.0 - get_settings().search_min_similarity,
+            )
+            .order_by(distance, Item.id.desc())
+            .limit(CANDIDATES)
+        )
+    )
+    return rrf(keyword_ids, semantic_ids), "hybrid"
+
+
 @router.get("/search", response_model=SearchPage)
 def search(
     q: Annotated[str, Query(min_length=1, max_length=200, description="Web-search syntax.")],
@@ -74,38 +109,7 @@ def search(
     if not q:
         raise ApiError(422, "validation_error", "query.q must not be blank")
     tsq = func.websearch_to_tsquery("english", q)
-    doc = Item.tsv.op("||")(AIAnnotation.summary_tsv)
-    keyword_ids = list(
-        db.scalars(
-            apply_filters(base(Item.id), filters)
-            .where(or_(Item.tsv.op("@@")(tsq), AIAnnotation.summary_tsv.op("@@")(tsq)))
-            .order_by(func.ts_rank_cd(doc, tsq).desc(), Item.id.desc())
-            .limit(CANDIDATES)
-        )
-    )
-    mode: Literal["hybrid", "keyword"] = "hybrid"
-    semantic_ids: list[int] = []
-    try:
-        vec = embedder.embed(q)
-    except Exception as exc:  # degrade to keyword search, never fail the request
-        log.warning("search embedding failed; keyword only", extra={"error": type(exc).__name__})
-        mode = "keyword"
-    else:
-        distance = Item.embedding.cosine_distance(vec)
-        db.execute(text("SET LOCAL hnsw.iterative_scan = relaxed_order"))
-        semantic_ids = list(
-            db.scalars(
-                apply_filters(base(Item.id), filters)
-                .where(
-                    Item.embedding.is_not(None),
-                    distance < 1.0 - get_settings().search_min_similarity,
-                )
-                .order_by(distance, Item.id.desc())
-                .limit(CANDIDATES)
-            )
-        )
-
-    fused = rrf(keyword_ids, semantic_ids)
+    fused, mode = hybrid(db, embedder, tsq, q, filters)
     page = fused[pg.offset : pg.offset + pg.page_size]
     snippet = func.ts_headline(
         "english",

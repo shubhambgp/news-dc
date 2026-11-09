@@ -72,3 +72,37 @@ class FakeEmbedder:
         raw = [math.sin(seed[i % 32] * (i + 1)) for i in range(EMBEDDING_DIM)]
         norm = math.sqrt(sum(x * x for x in raw))
         return [x / norm for x in raw]
+
+
+class FakeChat:
+    """Streams `chunks`, then an LLMResponse with `stop_reason`. `error` is raised after
+    `error_after` chunks. `closed_early` is True when the consumer closed the stream mid-way."""
+
+    model = "fake-chat"
+
+    def __init__(
+        self,
+        chunks: tuple[str, ...] = ("Operators are adopting liquid cooling [1].",),
+        stop_reason: str = "end_turn",
+        error: Exception | None = None,
+        error_after: int = 0,
+    ) -> None:
+        self.chunks, self.stop_reason = chunks, stop_reason
+        self.error, self.error_after = error, error_after
+        self.calls: list[dict[str, Any]] = []
+        self.closed_early = False
+
+    def stream_text(self, *, system: str, messages: list[Any], max_tokens: int):
+        self.calls.append({"system": system, "messages": messages, "max_tokens": max_tokens})
+        try:
+            for i, chunk in enumerate(self.chunks):
+                if self.error and i == self.error_after:
+                    raise self.error
+                yield chunk
+            if self.error:
+                raise self.error
+            text = "".join(self.chunks)
+            yield LLMResponse(text, self.model, self.stop_reason, 900, 120, 0, 0, 5)
+        except GeneratorExit:
+            self.closed_early = True
+            raise

@@ -174,7 +174,7 @@ def test_request_body_size_limits():
     assert_error(r, 411, "length_required")
 
 
-def test_openapi_lists_every_phase4_endpoint_and_error_shape():
+def test_openapi_lists_every_endpoint_and_error_shape():
     spec = client.get("/api/v1/openapi.json").json()
     assert set(spec["paths"]) == {
         "/api/v1/health",
@@ -188,6 +188,8 @@ def test_openapi_lists_every_phase4_endpoint_and_error_shape():
         "/api/v1/topics",
         "/api/v1/topics/{slug}",
         "/api/v1/search",
+        "/api/v1/ask",
+        "/api/v1/ask/suggestions",
     }
     assert "ErrorResponse" in spec["components"]["schemas"]
     item_responses = spec["paths"]["/api/v1/items/{item_id}"]["get"]["responses"]

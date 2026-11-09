@@ -3,7 +3,14 @@
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, StringConstraints
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    StringConstraints,
+    model_validator,
+)
 from pydantic.alias_generators import to_camel
 
 
@@ -183,3 +190,45 @@ class ForYouPage(Page[ForYouItem]):
         description="True when the profile was empty and the feed fell back to Trending + Most "
         "relevant. The UI shows the topic picker."
     )
+
+
+# --- Ask NewsDC (PLAN Phase 6) -------------------------------------------------------------------
+
+
+class ChatMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant"]
+    content: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
+
+
+class AskRequest(BaseModel):
+    """`history` is up to two earlier exchanges, oldest first (user, assistant, user, assistant).
+    It may clarify the question; it never overrides the assistant's rules (§11.8)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
+    history: list[ChatMessage] = Field(default_factory=list, max_length=4)
+
+    @model_validator(mode="after")
+    def _alternating(self) -> "AskRequest":
+        roles = [m.role for m in self.history]
+        if roles != ["user", "assistant"] * (len(roles) // 2) or len(roles) % 2:
+            raise ValueError("history must be user/assistant pairs, oldest first")
+        return self
+
+
+class AskSource(BaseModel):
+    """A numbered source of an answer. `[n]` in the answer refers to `n`. The link comes from the
+    database, never from the model (§11.8)."""
+
+    n: int
+    id: int
+    title: str
+    url: str
+    publisher: str | None
+    published_at: UtcDatetime | None
+    source: SourceRef | None
+    primary_category: str | None
+    content_type: ContentType | None

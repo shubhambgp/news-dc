@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     # Semantic search hits below this cosine similarity are dropped (bge-small: off-topic queries
     # peak around 0.5-0.6 on this corpus, see VERIFICATION_LOG Phase 4).
     search_min_similarity: float = 0.6
+    # Ask NewsDC (Phase 6). Prices are per million tokens for ASSISTANT_MODEL (cost logging only).
+    assistant_effort: str = "low"  # output_config.effort; empty = omit
+    assistant_max_tokens: int = 4000  # hard cap per answer (thinking + text)
+    assistant_input_usd_per_mtok: float = 0.0
+    assistant_output_usd_per_mtok: float = 0.0
+    rate_limit_ask: str = "10/minute"  # per client IP, on top of RATE_LIMIT_DEFAULT
     job_lease_seconds: int = 600
     github_token: str = ""
     log_level: str = "INFO"
