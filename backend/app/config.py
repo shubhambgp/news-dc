@@ -29,9 +29,14 @@ class Settings(BaseSettings):
     llm_concurrency: int = 5
     llm_timeout_seconds: float = 60.0
     near_duplicate_threshold: float = 0.92
+    # Semantic search hits below this cosine similarity are dropped (bge-small: off-topic queries
+    # peak around 0.5-0.6 on this corpus, see VERIFICATION_LOG Phase 4).
+    search_min_similarity: float = 0.6
     job_lease_seconds: int = 600
     github_token: str = ""
     log_level: str = "INFO"
+    # Limit for every public route, per client IP, in-process memory (`limits` syntax).
+    rate_limit_default: str = "60/minute"
     # Repo-root config/ (categories.yaml, sources.yaml). In the container this resolves to /config.
     config_dir: Path = Path(__file__).resolve().parents[2] / "config"
 

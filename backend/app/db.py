@@ -18,7 +18,9 @@ engine = create_engine(
     pool_timeout=10,
     connect_args={
         "connect_timeout": 3,
-        "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=60000",
+        # UTC sessions so every timestamp the API returns is serialized as UTC (§11.7).
+        "options": "-c timezone=UTC -c statement_timeout=30000 "
+        "-c idle_in_transaction_session_timeout=60000",
     },
 )
 SessionLocal = sessionmaker(engine, expire_on_commit=False)

@@ -238,6 +238,7 @@ class AIAnnotation(Base):
         CheckConstraint("tokens_in IS NULL OR tokens_in >= 0", name="tokens_in_nonneg"),
         CheckConstraint("tokens_out IS NULL OR tokens_out >= 0", name="tokens_out_nonneg"),
         Index("ix_ai_annotations_primary_category", "primary_category"),
+        Index("ix_ai_annotations_summary_tsv", "summary_tsv", postgresql_using="gin"),
     )
 
     item_id: Mapped[int] = mapped_column(
@@ -253,6 +254,11 @@ class AIAnnotation(Base):
     categories: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))
     content_type: Mapped[str | None] = mapped_column(String(32))
     summary: Mapped[str | None] = mapped_column(Text)
+    # Searched together with items.tsv (D-029): a generated column can only read its own row.
+    summary_tsv: Mapped[Any] = mapped_column(
+        TSVECTOR,
+        Computed("setweight(to_tsvector('english', coalesce(summary, '')), 'B')", persisted=True),
+    )
     key_insights: Mapped[list[Any]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
     entities: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     tags: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'"))

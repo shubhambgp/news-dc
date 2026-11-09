@@ -1,21 +1,43 @@
 import logging
-from collections.abc import AsyncIterator
+import re
+import time
+import uuid
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import Literal
+from typing import Any, Literal
 
-from fastapi import APIRouter, FastAPI, Response
+from fastapi import APIRouter, FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from starlette.exceptions import HTTPException
 
 from app import __version__, db
+from app.api import feeds, items, search, topics
+from app.api.common import ApiError
 from app.config import get_settings
-from app.logging import setup_logging
+from app.logging import request_id_var, setup_logging
+from app.schemas import ErrorResponse
+from app.security import API_CSP, DEFAULT_LIMIT, RATE_LIMIT_EXEMPT, SECURITY_HEADERS, allow
 from app.seed import seed
 
 log = logging.getLogger("app.main")
+access_log = logging.getLogger("app.access")
 
-router = APIRouter(prefix="/api/v1")
+API_PREFIX = "/api/v1"
+DOCS_PATHS = (f"{API_PREFIX}/docs", f"{API_PREFIX}/openapi.json")
+_CLIENT_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+_HTTP_CODES = {
+    400: "bad_request",
+    404: "not_found",
+    405: "method_not_allowed",
+    413: "payload_too_large",
+    429: "rate_limited",
+}
+
+router = APIRouter(prefix=API_PREFIX)
 
 
 class Health(BaseModel):
@@ -53,6 +75,84 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
 
+def error_response(request: Request, status: int, code: str, message: str) -> JSONResponse:
+    """The one error shape (§11.7): {"error": {"code", "message", "request_id"}}."""
+    rid = getattr(request.state, "request_id", "") or ""
+    body = {"error": {"code": code, "message": message, "request_id": rid}}
+    return JSONResponse(body, status_code=status, headers={"X-Request-ID": rid} if rid else None)
+
+
+def _validation_message(exc: RequestValidationError) -> str:
+    parts = []
+    for err in exc.errors()[:3]:
+        loc = ".".join(str(p) for p in err.get("loc", ()))
+        parts.append(f"{loc}: {err.get('msg', 'invalid')}")
+    return "; ".join(parts) or "invalid request"
+
+
+def install_error_handlers(app: FastAPI) -> None:
+    @app.exception_handler(ApiError)
+    async def api_error(request: Request, exc: ApiError) -> JSONResponse:
+        return error_response(request, exc.status, exc.code, exc.message)
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+        return error_response(request, 422, "validation_error", _validation_message(exc))
+
+    @app.exception_handler(HTTPException)
+    async def http_error(request: Request, exc: HTTPException) -> JSONResponse:
+        code = _HTTP_CODES.get(exc.status_code, "http_error")
+        return error_response(request, exc.status_code, code, str(exc.detail))
+
+
+async def rate_limit(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Default per-IP limit on every route except the health probes. CORS preflights are answered
+    by the CORS middleware before they get here."""
+    client = request.client.host if request.client else "unknown"
+    if request.url.path not in RATE_LIMIT_EXEMPT and not allow(client):
+        return error_response(request, 429, "rate_limited", f"rate limit exceeded: {DEFAULT_LIMIT}")
+    return await call_next(request)
+
+
+async def request_context(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Request ID, JSON access log, security headers, and a last-resort error envelope."""
+    supplied = request.headers.get("x-request-id", "")
+    rid = supplied if _CLIENT_REQUEST_ID.match(supplied) else uuid.uuid4().hex
+    request.state.request_id = rid
+    token = request_id_var.set(rid)
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except OperationalError as exc:  # DB down: degraded, not a code bug
+        log.error("database unavailable", extra={"error": type(exc).__name__})
+        response = error_response(request, 503, "db_unavailable", "database unavailable")
+    except Exception:
+        log.exception("unhandled error")
+        response = error_response(request, 500, "internal_error", "internal server error")
+    finally:
+        request_id_var.reset(token)
+    response.headers["X-Request-ID"] = rid
+    response.headers.update(SECURITY_HEADERS)
+    if request.url.path not in DOCS_PATHS:
+        response.headers["Content-Security-Policy"] = API_CSP
+    access_log.info(
+        "request",
+        extra={
+            "request_id": rid,
+            "method": request.method,
+            "path": request.url.path,  # no query string: search terms stay out of the logs
+            "status": response.status_code,
+            "duration_ms": round((time.perf_counter() - start) * 1000, 1),
+            "client": request.client.host if request.client else None,
+        },
+    )
+    return response
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     setup_logging(settings.log_level)
@@ -63,14 +163,32 @@ def create_app() -> FastAPI:
         openapi_url="/api/v1/openapi.json",
         redoc_url=None,
         lifespan=lifespan,
+        responses={
+            422: {"model": ErrorResponse, "description": "Validation error"},
+            429: {"model": ErrorResponse, "description": "Rate limited"},
+            500: {"model": ErrorResponse, "description": "Internal error"},
+        },
     )
+    install_error_handlers(app)
+    # Added inner to outer: the rate limiter runs inside CORS (so a 429 is readable by the
+    # browser), and request_context wraps everything (so every response gets an ID and a log line).
+    app.middleware("http")(rate_limit)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
         allow_methods=["GET", "POST"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "X-Request-ID"],
+        expose_headers=["X-Request-ID"],
     )
+    app.middleware("http")(request_context)
     app.include_router(router)
+    not_found: dict[int | str, dict[str, Any]] = {
+        404: {"model": ErrorResponse, "description": "Not found"}
+    }
+    app.include_router(items.router, prefix=API_PREFIX, responses=not_found)
+    app.include_router(feeds.router, prefix=API_PREFIX)
+    app.include_router(topics.router, prefix=API_PREFIX, responses=not_found)
+    app.include_router(search.router, prefix=API_PREFIX)
     return app
 
 
