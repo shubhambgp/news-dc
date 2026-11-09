@@ -20,3 +20,22 @@ Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
 | CI workflow | Agent | actionlint and GitHub workflow schema. Not yet run on GitHub. Pending human verification |
 | Docs and logs (README, CHANGELOG, DECISIONS, RISKS, PHASE_STATUS, SOURCE_REGISTER, AI_EVALUATION, this log) | Agent | Manual review. Pending human verification |
 | Diff review and commit | Agent | `git diff --stat` and `git status` reviewed before commit |
+
+## Phase 1: Database schema & config
+
+Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
+
+| Task | Done by | How it was verified |
+|---|---|---|
+| Re-read Phase 1, §5, §6, §11.2, §11.3, §11.6, §11.10 | Agent | n/a |
+| SQLAlchemy models for all §5 tables + `item_sources` | Agent | `alembic check` reports no drift; DB integration tests. Pending human verification |
+| Alembic setup and migration `0001` (vector extension, generated `tsv` + GIN, HNSW, indexes) | Agent | `alembic upgrade head` on a fresh DB; downgrade/upgrade roundtrip test; index definitions asserted in tests. Pending human verification |
+| CHECK constraints, FK delete rules, timezone-aware timestamps | Agent | One integration test per constraint group, plus a query asserting no `timestamp without time zone` columns. Pending human verification |
+| `config/categories.yaml` (14 categories, keywords) | Agent | Loader test asserts 14 valid entries. Category wording pending human review |
+| `config/sources.yaml` (3 API sources, disabled) | Agent | Loader test. Endpoints/terms **not yet verified** (Phase 2) |
+| Seeding (`app/seed.py`), startup hook, `python -m app.seed` | Agent | Integration test (14 categories, idempotent, Admin toggle survives); manual uvicorn run on an unmigrated DB (logs error, stays up) and on a migrated DB (seeds 14). Pending human verification |
+| `canonicalize_url()` / `url_hash()` | Agent | 31 unit tests. Pending human verification |
+| DB pool limits and statement timeouts | Agent | Code review only; exercised by the running app. Pending human verification |
+| Compose (migrate on start, config mount) and CI Postgres service | Agent | compose-spec and GitHub workflow schema validation, actionlint. **Runtime BLOCKED** (no Docker; not pushed). Pending human verification |
+| Docs and logs | Agent | Manual review. Pending human verification |
+

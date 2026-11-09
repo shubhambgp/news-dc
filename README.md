@@ -2,13 +2,13 @@
 
 AI-powered discovery platform for Data Center news and research.
 
-> Status: **Phase 0 (project skeleton)**. See [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) and [plan.md](plan.md) for the build plan.
+> Status: **Phase 1 (database schema & config)**. See [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) and [plan.md](plan.md) for the build plan.
 
 ## Quick start (Docker)
 
 ```bash
 cp .env.example .env          # fill in values; never commit .env
-docker compose up --build
+docker compose up --build    # backend runs `alembic upgrade head`, then seeds config/ on startup
 curl localhost:8000/api/v1/health   # {"status":"ok","db":"ok","version":"0.1.0"}
 open http://localhost:5173          # status page
 ```
@@ -23,6 +23,7 @@ Requires Python 3.12 via [uv](https://docs.astral.sh/uv/), Node 24 + pnpm, and a
 # backend
 cd backend
 uv sync
+uv run alembic upgrade head                # create/upgrade the schema (needs pgvector in Postgres)
 uv run uvicorn app.main:app --reload       # http://localhost:8000
 uv run python -m app.worker                # scheduler process (no jobs until Phase 2/3)
 
@@ -36,13 +37,16 @@ pnpm dev                                   # http://localhost:5173
 
 ```bash
 cd backend  && uv run ruff format --check . && uv run ruff check . && uv run mypy app && uv run pytest -q
+# DB integration tests run only when TEST_DATABASE_URL points at a THROWAWAY pgvector database:
+TEST_DATABASE_URL=postgresql+psycopg://newsdc:newsdc@localhost:5433/newsdc_test uv run pytest -q
 cd frontend && pnpm lint --deny-warnings && pnpm typecheck && pnpm build
 ```
 
 ## Layout
 
 ```
-backend/   FastAPI app (app/), tests, uv project
+backend/   FastAPI app (app/), Alembic migrations (alembic/), tests, uv project
+config/    categories.yaml (14 categories) and sources.yaml, seeded into the DB on startup
 frontend/  React 19 + Vite + TypeScript + Tailwind + shadcn/ui
 docs/      logs, decisions, risks, phase status
 ```

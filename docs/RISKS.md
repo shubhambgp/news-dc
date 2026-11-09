@@ -8,3 +8,5 @@
 | R-004 | APScheduler isn't a durable queue (§11.4). | Certain / High if ignored | A DB-backed job table with `SKIP LOCKED` is planned for Phase 3. | Agent | Planned | Phase 3 |
 | R-005 | LLM model IDs and capabilities may change. | Medium / Medium | IDs come from env and are verified against official docs in Phase 3/6. | Agent | Open | Phase 3 |
 | R-006 | Source volume may not reach 1,500 raw / 500 processed. | Medium / Medium | Report actual counts. Never fabricate (§11.6). | Agent + Human | Open | Phase 2 backfill |
+| R-007 | Phase 1 was verified locally on PostgreSQL 18.6 + pgvector 0.8.1, not on the `pgvector/pgvector:pg16` image used by compose and CI. | Medium / Low | Only portable DDL is used (no PG17/18 features). CI runs the integration tests on the pg16 image. | Human | Open | CI integration tests fail |
+| R-008 | The startup seed runs in every backend process. A YAML error stops startup. | Low / Medium | YAML is validated in a unit test that runs in CI, so a bad file fails CI first. | Agent | Mitigated | Startup fails after a config edit |
