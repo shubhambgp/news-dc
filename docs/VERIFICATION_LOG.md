@@ -880,3 +880,49 @@ The JSON parsed with `json.load`. No actions that queue paid jobs were run on th
 `python scripts/export_dataset.py` → `wrote 1000 records to /home/shubham/Documents/news-dc/data/sample/newsdc_sample.json and newsdc_sample.md` (exit 0). The JSON is 1,481,854 bytes and the Markdown 828,277 bytes. A `json.load` check found 1000 records, the fields listed in API.md, and no `content_text` key.
 
 Not run: `docker compose` (no Docker, R-001), so the non-root frontend Dockerfile change hasn't been built. CI on GitHub (not pushed). Rendering the Markdown in a browser or editor: pending human verification.
+
+## Phase 9 (2026-11-10)
+
+Environment: same machine and PostgreSQL 18.6 + pgvector 0.8.1 cluster (port 55433, `newsdc` with 3,898 items / 2,609 processed; `newsdc_test` for pytest). No Docker. Backend run with `backend/.venv/bin/uvicorn app.main:app --port 8000` and `CORS_ORIGINS=http://localhost:5173,http://localhost:4173`. Frontend: Node 24.19.0, pnpm 11.22.0, production build served by `vite preview` on :4173 (built with `VITE_API_BASE_URL=http://localhost:8000`). Browser: the installed Google Chrome (Playwright `channel: 'chrome'`, Lighthouse `CHROME_PATH=/usr/bin/google-chrome`). One real, paid `claude-opus-5-5` call (the live Ask check, logged at $0.03024).
+
+Acceptance checks (plan Phase 9): Lighthouse on the home page Performance ≥ 85 and Accessibility ≥ 95; works at 375 px and on desktop; both themes look right.
+
+### Automated checks (final state)
+| Command | Result |
+|---|---|
+| `pnpm lint --deny-warnings` (oxlint) | no warnings |
+| `pnpm typecheck` | no errors |
+| `pnpm test` (Vitest) | `Tests 10 passed (10)` |
+| `pnpm build` | `✓ built`; main chunk 352.5 kB (110.9 kB gzip), Dashboard chunk 397.2 kB (113.3 kB gzip, Recharts) |
+| `pnpm e2e` (Playwright, API mocked) | `1 passed (7.9s)` |
+| `ruff format --check .` / `ruff check .` / `mypy app` | `75 files already formatted` / `All checks passed!` / `Success: no issues found in 42 source files` |
+| `TEST_DATABASE_URL=...newsdc_test pytest -q` | `373 passed` (new: `test_search_sort_latest_keeps_hits_newest_first`) |
+
+Failures on the way, and fixes:
+- `tsc`: `Property 'error' does not exist on type 'never'` in `Feed.tsx` after the early `isError` return. Fixed by destructuring `error` before the returns.
+- oxlint: `only-export-components` (hooks exported from component files), `refs` (ref read during render), `set-state-in-effect` (search box synced from the URL). Fixed: hooks moved to `src/lib/filters.ts`, `useCallback` for the help dialog opener, the search box is re-keyed on the URL query.
+- pytest collection: `SyntaxError: parameter without a default follows parameter with a default` after adding `sort` to `/search`. Moved the parameter last.
+- E2E: two "Read original" links matched (a hidden per-card link for `Shift+O`). That link was also redundant for screen readers; the card now carries the URL in `data-original`. Second failure: pressing `t` after clicking the page body didn't toggle the theme (the click landed on an element in the page); the test now presses `Esc` to leave the question box.
+- Lighthouse a11y on `/dashboard`: 97, `aria-hidden-focus` (Recharts 3 makes charts focusable inside the `aria-hidden` wrapper that is backed by a table view). Fixed with `accessibilityLayer={false}`; rerun 100.
+- First screenshot of `/dashboard` showed the per-day line stopping at 11-01: the screenshot was taken during Recharts' animation (the API returns all 60 days). Chart animation turned off.
+
+### Lighthouse 13.6.0 (`pnpm dlx lighthouse@13.6.0 http://localhost:4173/ --chrome-flags="--headless=new"`)
+| Page | Mode | Performance | Accessibility | Best practices | SEO |
+|---|---|---|---|---|---|
+| `/` (home) | mobile (default), run 1 | **88** | **100** | 100 | 100 |
+| `/` (home) | mobile, run 2 | **90** | **100** | | |
+| `/` (home) | `--preset=desktop` | **94** | **100** | | |
+
+Run 1 details: TBT 310 ms, CLS 0.139, unused JS ~56 KiB. Run 2: LCP 0.8 s, CLS 0. Desktop: LCP 0.7 s, CLS 0.151. Accessibility only (mobile): `/article/4561` 100, `/dashboard` 100 (after the fix above), `/ask` 100, `/search?q=cooling` 100, `/topics` 100, `/trending` 100, `/admin` 100. The scores were taken against a local API, so they leave out network latency to a real server.
+
+### Responsive and themes (agent check, not human)
+A Playwright script opened 10 routes (`/`, `/trending`, `/topics`, `/topics/cooling`, `/article/4561`, `/search?q=liquid cooling`, `/dashboard`, `/ask`, `/admin`, `/bookmarks`) at 1366×900 in light mode and 375×812 in dark mode on live data, took screenshots and checked `scrollWidth > innerWidth`. Result: no horizontal overflow on any route, no page errors; the only console errors were the expected `401` from `GET /admin/session` before login. From the screenshots, two mobile fixes: filters now wrap two per row, and "Your interests" moved into a collapsible section under the topic picker.
+
+### Live checks on real data
+- **Admin** (token read from `.env` by the script, never printed): wrong token shows "Wrong token."; correct token shows the dashboard (11 sources, 3 jobs); `Pause hn` then `Resume hn` (CSRF-protected `PATCH`) both answered "done"; the session survived a reload (`GET /admin/session`); logout returned to the login form. No paid actions were triggered.
+- **Ask NewsDC** through the UI: "Which hyperscalers are investing in new data centers?" streamed an answer with 8 citation links and 8 source cards; every `#src-0-n` link target exists. Server log: `sources 8, cited 5, removed_citations 0, tokens_in 4074, tokens_out 660, latency_ms 6979, cost_usd 0.03024`.
+
+### Not checked
+- Human review of the UI in both themes and at phone width (pending).
+- Safari/Firefox (only Chrome was used).
+- CI on GitHub (not pushed); the new CI steps (`pnpm test`, Playwright install, `pnpm e2e`) ran only locally.

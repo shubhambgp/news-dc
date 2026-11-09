@@ -261,3 +261,18 @@ Each entry: context, options, decision, why, trade-offs, and whether it changes 
 - **Profile tags:** `tagWeights` is now ≤ 100 entries, as Phase 8 specifies (it was 200).
 - **Not done (deliberately):** the global daily spend cap for Ask NewsDC (D-033) and storing its spend for `/stats`. They aren't in the Phase 8 scope or acceptance; the per-IP limit and the max-tokens cap still bound it. The §11.11 admin operational summary is covered by `/stats` plus `/admin/runs` and `/admin/jobs`; queue depth and latency metrics wait for Phase 10 operations work.
 - **Changes plan:** minor (paths, prompt-hash outdating), recorded here and in the CHANGELOG.
+
+
+## D-036 (2026-11-10): Phase 9 frontend choices
+- **Router:** React Router 8 (`createBrowserRouter`), routes lazy-loaded except the home feed. The main bundle is 111 KB gzip; Recharts (113 KB gzip) loads only on `/dashboard`, `react-markdown` only on Ask and Dashboard.
+- **No component library beyond the existing shadcn button/badge/card.** Dialogs (shortcuts help, mobile drawer) use the native `<dialog>` element, which gives focus trapping and `Esc` for free. Filters use native `<select>` and `<input type="date">`.
+- **Profile store:** a module-level store with `useSyncExternalStore` instead of a context or a state library. Pure functions (`applyEvent`, `decay`, `parseProfile`, `toRequest`) carry the logic and are unit tested. Bookmarked items are stored whole (`newsdc-bookmarks`), so the Bookmarks page and its export need no API calls. "Reset my preferences" keeps bookmarks.
+- **Reading time:** "+2 after 30 s" counts only time with the tab visible.
+- **Discover section:** the server interleaves discovery items into For You (every 5th). The UI marks them with a "Discover" label and a coloured edge in place, instead of moving them into a separate list, so pagination stays consistent.
+- **Keyboard shortcuts** drive the DOM: cards carry `data-card` and `data-open/-bookmark/-dismiss/-original` hooks, so there is one global handler and no per-list state.
+- **Search sort:** the plan asks for sorting on `/search`, which had none. `sort=latest` reorders the same fused hits by date (backend, a few lines). Other sorts would change what "a hit" means.
+- **Snippets** are rendered by splitting on `<mark>` and decoding the text, never `innerHTML`, although the API already escapes them.
+- **Sitemap:** not generated. A sitemap needs absolute URLs, and the domain is only known at deployment (Phase 10). `robots.txt` is added.
+- **Playwright** mocks the whole API inside the test, so the smoke test needs no backend or DB and runs in CI. The real API was exercised separately (live checks in VERIFICATION_LOG). Locally it uses the installed Chrome; CI installs Playwright's Chromium.
+- **Commits:** the plan asks for one commit per subphase. The router in `App.tsx` wires every page, so 9A–9D can't build separately without stub pages. The phase is split into a backend commit, one frontend commit and a docs commit instead.
+- **Changes plan:** minor (search sort, commit grouping), recorded here and in the CHANGELOG.

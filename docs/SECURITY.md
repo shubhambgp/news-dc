@@ -55,7 +55,7 @@ The human should rotate the Anthropic key that was pasted into a chat during Pha
 - Paywalls and robots.txt are respected (D-016). Full text is stored only where the source allows it, and it is never returned by the API or exported.
 - LLM output is untrusted. Ask NewsDC citations are built from retrieved item IDs and DB URLs, and unknown `[n]` are removed (§11.8). Retrieved text is fenced as evidence, never instructions.
 - API search snippets are HTML-escaped, with only `<mark>` added. The Markdown export escapes every markup character and links only `http(s)` URLs.
-- **Phase 9:** the frontend renders summaries and answers through a Markdown renderer with a sanitizer and no raw HTML, and checks link protocols (`http`/`https` only) before rendering `href`s.
+- Frontend (Phase 9): model Markdown (answers, trend brief) goes through `react-markdown` with `skipHtml`, images dropped and only `http(s)` links (`frontend/src/components/Markdown.tsx`). Summaries and titles are plain React text. Every external `href` passes `safeUrl` (`http`/`https` only) and opens with `rel="noopener noreferrer"`. Search snippets are split on `<mark>` and decoded as text, never set with `innerHTML`. The admin CSRF token lives only in memory (TanStack Query cache), never in `localStorage`. The E2E test checks that an escaped snippet renders as text.
 
 ## Headers, CORS, CSP
 

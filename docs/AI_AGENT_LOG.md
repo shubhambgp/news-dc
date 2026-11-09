@@ -158,3 +158,18 @@ Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
 | Hardening: profile tags ≤ 100, CORS credentials/PATCH/CSRF header, non-root frontend dev image, `.env.example`, `docs/SECURITY.md` | Agent | Tests; frontend image **not built** (no Docker) |
 | Docs: API.md, SECURITY.md, DECISIONS D-035, RISKS R-018, CHANGELOG, CLAUDE.md | Agent | Pending human review |
 | Try admin login and the actions with a real `ADMIN_TOKEN`/`SESSION_SECRET`; open the exported Markdown and JSON | Human | **Pending human verification** |
+
+## Phase 9: Frontend UI (9A–9E)
+
+| Task | Done by | How verified |
+|---|---|---|
+| Re-read Phase 9, §11.7, §11.8, §11.12, §12, D-032/D-033/D-035; inspected the Phase 0 frontend, `docs/API.md` and `schemas.py` | Agent | n/a |
+| 9A: router, layout (top bar, sidebar, mobile nav/drawer), theme tokens, API client with error envelope | Agent | typecheck, lint, build; screenshots at 1366 px (light) and 375 px (dark) on live data |
+| 9B: For You (picker, reasons, Discover, Trending strip, interests + reset), Trending tabs, Most relevant, Topics, topic pages, URL filters, infinite scroll | Agent | Screenshots on live data; E2E (picker → feed, request body has `explicitTopics`) |
+| 9C: article page, localStorage profile (weights, decay, limits), reading tracking, bookmarks + JSON/Markdown export | Agent | `profile.test.ts` (10); E2E (article → bookmark → bookmarks) |
+| 9D: Search (filters, dates, sort, snippets), Ask streaming UI with citations, Dashboard charts and brief, Admin UI; backend `sort=latest` on `/search` | Agent | E2E (search, mocked ask); live Ask (8/8 citations map to source cards); live Admin login/pause/resume/logout; pytest test for the sort |
+| 9E: keyboard shortcuts and help, a11y (skip link, labels, focus), titles/meta, Playwright smoke test, CI steps | Agent | E2E (`g b`, `/`, `a`, `t` persisted over reload, `?`); Lighthouse |
+| Lighthouse home page: Performance ≥ 85, Accessibility ≥ 95 | Agent | Lighthouse 13.6.0 run by the agent (numbers in VERIFICATION_LOG). Pending human verification |
+| Both themes look right; works at 375 px and desktop | Agent | Agent screenshots and an overflow check on 10 routes. **Pending human verification** |
+| Docs: CHANGELOG, API.md (search sort), DECISIONS D-036, logs, status | Agent | Pending human review |
+| Click through the UI in a browser (both themes, phone width), try the shortcuts, bookmark export and Admin | Human | **Pending human verification** |

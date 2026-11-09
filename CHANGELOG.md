@@ -4,6 +4,21 @@ All notable changes, grouped by build phase. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 9: Frontend UI, 9A–9E (2026-11-10)
+
+#### Added
+- **9A foundation:** React Router 8 with route-level code splitting (`frontend/src/App.tsx`), the layout (top bar with search, Ask AI, theme toggle and shortcuts help; desktop sidebar with navigation and categories; mobile bottom nav and drawer), a blue primary design token for both themes, and a typed API client for every public and admin endpoint (`src/lib/api.ts`) with the error envelope as `ApiError`. TanStack Query retries only network and 5xx errors.
+- **9B feeds:** For You (onboarding topic picker on first visit, "why" reasons, marked Discover rows, Trending strip, "Your interests" panel with weights and a reset button), Trending (24h / 7d / 30d tabs), Most relevant, Topics grid (counts and latest headlines) and topic pages with a sort. Every feed has filters in the URL (category, content type, source, min quality) and infinite scroll (IntersectionObserver + "Load more"). Read items are dimmed, "Not interested" hides an item.
+- **9C article, bookmarks, reading history:** article page (summary, technical/business insights, type, scores, entities, tags, "Read original", HN and related discussions, "Also covered by", related articles, bookmark, not interested). The localStorage profile (`src/lib/profile.ts`): open +1, 30 s visible reading +2, bookmark +3, not interested −3 on the item's categories and tags, ×0.95 daily decay, the server's limits, malformed storage tolerated, sync across tabs. Bookmarks page with client-side JSON/Markdown export.
+- **9D:** Search (filters, date range, sort, highlighted snippets rendered without `innerHTML`, all state in the URL); Ask NewsDC (suggested questions, streamed answer over `fetch` + `ReadableStream`, `[n]` citations linking to source cards, stop button, 2 exchanges of history, errors discard partial answers); Dashboard (Recharts: per-day, funnel, category, content type, source; rising topics; the trend brief with citations; AI cost; last runs; export buttons; a table view under every chart); Admin (login, session after reload, all Phase 8 actions with the CSRF header, paid actions confirm first, sources pause/resume/ingest, category edit/enable, jobs with dead-letter retry, runs, rejected items with reprocess, logout).
+- **9E:** keyboard shortcuts (`j/k`, `o`/`Enter`, `Shift+O`, `b`, `x`, `/`, `a`, `t`, `g h/t/p/b/d`, `?`, `Esc`) with a help dialog; skip link, labelled controls, focus rings; page titles and meta description; `robots.txt`.
+- `GET /api/v1/search` takes `sort=relevance|latest` (latest = the same hits, newest first). Test: `test_search_sort_latest_keeps_hits_newest_first`.
+- Tests: `src/lib/profile.test.ts` (Vitest, 10: weights, decay, limits, parsing, request body, SSE parsing) and `e2e/smoke.spec.ts` (Playwright: home → pick topics → article → bookmark → bookmarks → search → ask, plus theme persistence and the shortcuts dialog; API mocked). CI runs both.
+- Dependencies: `react-router`, `recharts`, `react-markdown`; dev: `vitest`, `jsdom`, `@playwright/test`.
+
+#### Changed
+- Markdown from the model (answers, trend brief) is rendered by `react-markdown` with raw HTML skipped, images dropped and only `http(s)` links.
+
 ### Phase 8: Admin, security & export (2026-11-09)
 
 #### Added
