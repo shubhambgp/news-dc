@@ -15,7 +15,7 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from starlette.exceptions import HTTPException
 
 from app import __version__, db
-from app.api import ask, feeds, items, search, topics
+from app.api import ask, feeds, items, search, topics, trends
 from app.api.common import ApiError
 from app.config import get_settings
 from app.logging import request_id_var, setup_logging
@@ -209,6 +209,7 @@ def create_app() -> FastAPI:
     app.include_router(topics.router, prefix=API_PREFIX, responses=not_found)
     app.include_router(search.router, prefix=API_PREFIX)
     app.include_router(ask.router, prefix=API_PREFIX)
+    app.include_router(trends.router, prefix=API_PREFIX)
     return app
 
 

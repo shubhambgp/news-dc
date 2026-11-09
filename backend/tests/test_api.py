@@ -190,6 +190,8 @@ def test_openapi_lists_every_endpoint_and_error_shape():
         "/api/v1/search",
         "/api/v1/ask",
         "/api/v1/ask/suggestions",
+        "/api/v1/trends",
+        "/api/v1/stats",
     }
     assert "ErrorResponse" in spec["components"]["schemas"]
     item_responses = spec["paths"]["/api/v1/items/{item_id}"]["get"]["responses"]

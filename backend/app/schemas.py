@@ -232,3 +232,124 @@ class AskSource(BaseModel):
     source: SourceRef | None
     primary_category: str | None
     content_type: ContentType | None
+
+
+# --- Trends and dashboard (PLAN Phase 7) --------------------------------------------------------
+
+
+class RisingTermOut(BaseModel):
+    term: str
+    recent: int = Field(description="Items mentioning it in the last 7 days.")
+    baseline: int = Field(description="Items mentioning it in the 28 days before.")
+    change_pct: int = Field(
+        description="Change of the share of items mentioning it, last 7 days vs the 28 before. "
+        "A term absent from the baseline is counted as 1 baseline item."
+    )
+    new: bool = Field(description="Not mentioned in the baseline window.")
+
+
+class BriefSource(BaseModel):
+    """`[n]` in the brief refers to `n`. Items no longer public are left out."""
+
+    n: int
+    id: int
+    title: str
+    url: str
+    publisher: str | None
+    published_at: UtcDatetime | None
+
+
+class TrendBriefOut(BaseModel):
+    id: int
+    period_start: UtcDatetime
+    period_end: UtcDatetime
+    content_md: str = Field(description="Untrusted Markdown with `[n]` citations.")
+    sources: list[BriefSource]
+    model: str | None
+    created_at: UtcDatetime
+
+
+class TrendsResponse(BaseModel):
+    recent_start: UtcDatetime
+    baseline_start: UtcDatetime
+    now: UtcDatetime
+    tags: list[RisingTermOut]
+    companies: list[RisingTermOut]
+    technologies: list[RisingTermOut]
+    brief: TrendBriefOut | None = Field(description="The latest trend brief, if any.")
+
+
+class Funnel(BaseModel):
+    """Every item ingested, and where it ended up."""
+
+    fetched: int
+    new: int
+    rejected_prefilter: int
+    rejected_ai: int
+    duplicate: int
+    failed: int
+    processed: int
+
+
+class CategoryStat(BaseModel):
+    slug: str
+    name: str
+    items: int = Field(description="Processed items with this primary category.")
+    avg_quality: float | None
+
+
+class Count(BaseModel):
+    key: str
+    items: int
+
+
+class SourceStat(BaseModel):
+    key: str
+    name: str
+    items: int = Field(description="Items this source found, any status.")
+    processed: int
+
+
+class DayCount(BaseModel):
+    date: str = Field(description="UTC date, YYYY-MM-DD.")
+    items: int
+
+
+class RunOut(BaseModel):
+    id: int
+    kind: str
+    trigger: str
+    source_key: str | None
+    status: str
+    started_at: UtcDatetime
+    finished_at: UtcDatetime | None
+    fetched: int
+    new: int
+    duplicates: int
+    rejected_prefilter: int
+    rejected_ai: int
+    processed: int
+    failed: int
+    cost_usd_estimate: float
+    stop_reason: str | None
+    error: str | None
+
+
+class AiCost(BaseModel):
+    """Estimates from token counts and the configured prices. Ask NewsDC answers are logged, not
+    stored, so they are not included."""
+
+    classifier_usd: float
+    classifier_today_usd: float
+    trend_brief_usd: float
+    total_usd: float
+
+
+class StatsResponse(BaseModel):
+    funnel: Funnel
+    by_category: list[CategoryStat]
+    by_content_type: list[Count]
+    by_source: list[SourceStat]
+    per_day: list[DayCount] = Field(description="Processed items by publication date, 60 days.")
+    pipeline_runs: list[RunOut] = Field(description="The 10 most recent runs.")
+    ai_cost: AiCost

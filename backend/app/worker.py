@@ -1,6 +1,7 @@
 """Worker entrypoint: `python -m app.worker`.
 
-APScheduler enqueues an `ingest_all` job every INGEST_INTERVAL_MINUTES (immediately on start).
+APScheduler enqueues an `ingest_all` job every INGEST_INTERVAL_MINUTES (immediately on start)
+and a `trend_brief` job every Monday at 06:00 UTC (when the assistant model is configured).
 The main loop claims jobs from the `jobs` table (app/jobs.py) and runs them; a finished ingest
 queues a `pipeline` job. Several worker replicas are safe: claims use SKIP LOCKED, one active job
 per kind is enforced by the database, and the pipeline itself holds an advisory lock.
@@ -22,7 +23,9 @@ from typing import Any
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app import db, jobs
-from app.ai.llm import LLMError
+from app.ai import trends
+from app.ai.classify import Prices
+from app.ai.llm import AnthropicLLM, LLMError
 from app.config import get_settings
 from app.ingest.runner import ingest_all
 from app.logging import setup_logging
@@ -56,6 +59,16 @@ def handle(job: Job, stop: threading.Event) -> None:
             raise RuntimeError(error) if result.retryable else jobs.PermanentJobError(error)
         if result.stop_reason == "shutdown requested":
             raise Interrupted
+    elif job.kind == "trend_brief":
+        s = get_settings()
+        llm = AnthropicLLM(
+            api_key=s.anthropic_api_key,
+            model=s.assistant_model,
+            effort=s.assistant_effort,
+            timeout_s=s.llm_timeout_seconds,
+        )
+        prices = Prices(s.assistant_input_usd_per_mtok, s.assistant_output_usd_per_mtok)
+        trends.generate_brief(db.engine, llm, prices, s.assistant_max_tokens)
     else:
         raise jobs.PermanentJobError(f"no handler for job kind {job.kind!r}")
 
@@ -105,6 +118,16 @@ def schedule_ingest(interval_minutes: int) -> None:
         log.exception("could not enqueue ingest job")
 
 
+def schedule_brief() -> None:
+    try:
+        job_id = jobs.enqueue(
+            db.engine, "trend_brief", {"trigger": "schedule"}, not_within=timedelta(days=6)
+        )
+        log.info("scheduled trend brief", extra={"job_id": job_id, "queued": job_id is not None})
+    except Exception:
+        log.exception("could not enqueue trend brief job")
+
+
 def main() -> None:
     settings = get_settings()
     setup_logging(settings.log_level)
@@ -122,6 +145,10 @@ def main() -> None:
         max_instances=1,
         coalesce=True,
     )
+    if settings.anthropic_api_key and settings.assistant_model:  # weekly, Monday 06:00 UTC
+        scheduler.add_job(schedule_brief, "cron", day_of_week="mon", hour=6, coalesce=True)
+    else:
+        log.warning("trend brief not scheduled: ANTHROPIC_API_KEY or ASSISTANT_MODEL not set")
     scheduler.start()
     log.info("worker started", extra={"worker_id": WORKER_ID})
     while not stop.is_set():

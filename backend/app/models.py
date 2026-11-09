@@ -45,7 +45,7 @@ CONTENT_TYPES = ("news", "research", "investment", "engineering")
 RUN_TRIGGERS = ("schedule", "admin", "cli")
 RUN_STATUSES = ("running", "succeeded", "partial", "failed")
 RUN_KINDS = ("ingest", "pipeline")
-JOB_KINDS = ("ingest_all", "pipeline")
+JOB_KINDS = ("ingest_all", "pipeline", "trend_brief")
 JOB_STATUSES = ("pending", "running", "succeeded", "retry_wait", "dead_letter", "cancelled")
 JOB_ACTIVE = ("pending", "running", "retry_wait")
 
@@ -346,11 +346,20 @@ class Job(Base):
 
 class TrendBrief(Base):
     __tablename__ = "trend_briefs"
-    __table_args__ = (CheckConstraint("period_end > period_start", name="period_valid"),)
+    __table_args__ = (
+        CheckConstraint("period_end > period_start", name="period_valid"),
+        Index("ix_trend_briefs_created_at", text("created_at DESC")),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     content_md: Mapped[str] = mapped_column(Text)
+    # Evidence item ids in citation order: `[n]` in content_md refers to sources[n-1].
     sources: Mapped[list[int]] = mapped_column(ARRAY(BigInteger), server_default=text("'{}'"))
+    model: Mapped[str | None] = mapped_column(Text)
+    prompt_version: Mapped[str | None] = mapped_column(Text)
+    tokens_in: Mapped[int | None] = mapped_column(Integer)
+    tokens_out: Mapped[int | None] = mapped_column(Integer)
+    cost_usd_estimate: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
     created_at: Mapped[datetime] = _created()
