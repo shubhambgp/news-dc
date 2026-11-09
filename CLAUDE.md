@@ -16,6 +16,17 @@ NewsDC: AI-powered discovery platform for Data Center news (ingest HN/RSS/arXiv/
 - The frontend talks to the backend only over the HTTP API. All routes go under `/api/v1`.
 - Docker isn't available on the agent machine (RISKS R-001). Verify against a local Postgres+pgvector and record anything that's blocked.
 
+## Skills
+
+Project skills are in `.claude/skills/` (pinned in `skills-lock.json`). Load the matching one before writing or reviewing code:
+
+- `python-patterns`: any backend Python (`backend/app`, tests, Alembic migrations).
+- `frontend-patterns`: React components, TanStack Query state, render performance in `frontend/`. Skip its Next.js parts (no Next.js, §11.1).
+- `backend-patterns`: API design and DB/query optimization only. Its examples are Node/Express/Next.js; translate the ideas to FastAPI + SQLAlchemy and don't copy the code.
+- `coding-standards`: naming and readability review when none of the above fits.
+
+The rules in this file and plan.md win over any skill.
+
 ## Commands
 
 Backend (run from `backend/`, Python 3.12 via uv):
