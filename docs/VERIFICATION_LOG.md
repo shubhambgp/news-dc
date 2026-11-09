@@ -356,3 +356,76 @@ Observations: title-only HN summaries state that no further text was available i
 - Worker and pipeline inside `docker compose` (incl. the `models` volume, `stop_grace_period`): no Docker on this machine (R-001).
 - CI on GitHub: not pushed.
 - Human review of the 40 eval labels and a human spot check of processed and rejected items: pending.
+
+## Phase 4 (2026-11-09)
+
+Environment: same machine and the same throwaway PostgreSQL 18.6 + pgvector 0.8.1 cluster as Phase 3 (port 55433). `newsdc` holds the live data (2,609 processed of 3,898 items, all embedded); `newsdc_test` is for pytest. No Docker. No LLM calls in this phase.
+
+### Migration on the live DB
+`uv run alembic upgrade head`: `Running upgrade 0002 -> 0003, full-text index over the AI summary for hybrid search`. The pytest `engine` fixture builds the test DB from an empty schema, and `test_downgrade_and_upgrade_roundtrip` covers 0003 down and up.
+
+### Automated checks (final state)
+| Command | Result |
+|---|---|
+| `uv lock --check` | `Resolved 111 packages` (`slowapi` and `wrapt` removed, `limits` 5.8.0 now direct) |
+| `uv run ruff format --check .` | `53 files already formatted` |
+| `uv run ruff check .` | `All checks passed!` |
+| `uv run mypy app` | `Success: no issues found in 33 source files` |
+| `TEST_DATABASE_URL=...newsdc_test uv run pytest -q` | `251 passed` (new: 33 in `test_api.py`, 30 in `test_api_db.py`) |
+| `uv run pytest -q` (no DB) | `167 passed, 84 skipped` |
+
+Failures along the way (all fixed):
+- mypy: `ARRAY.any()` typing (switched to `literal(x) == any_(col)`), `Row` tuple indexing, and the `responses=` dict type.
+- `test_api_db`: (1) `published_at` came back as `2026-10-05T17:30:00+05:30`. The test engine has no `timezone=UTC`, so the API was relying on the session timezone. **Fix:** the schemas now convert every timestamp to UTC `Z` themselves. (2) `/feeds/relevant?category=cooling` returned every item: `category` existed only on `/items`. **Fix:** `category` moved into the shared filters. (3) The similarity-floor test's query vector shared an axis with a fixture vector (a test bug).
+
+### Bug found in the live check: rate limiting did nothing
+The first live check sent 62 requests to `GET /api/v1/feeds/relevant?page_size=1` and got `62 200`. Cause: with FastAPI 0.162, `app.routes` holds `_IncludedRouter` objects that have no `endpoint`, so `slowapi.middleware._find_route_handler` returned `None` and `_should_exempt` exempted every request (seen by matching routes against a scope by hand). **Fix:** D-030, `limits` in our own middleware. After the fix, against the live server:
+```
+     60 200
+      2 429
+{"error":{"code":"rate_limited","message":"rate limit exceeded: 60 per 1 minute","request_id":"fd013534b1654aa986fc0ebf6b389c0d"}}
+health 200
+```
+
+### Semantic similarity floor (measured on the live corpus)
+Cosine similarity of the query embedding to the nearest processed items (bge-small-en-v1.5, HNSW with `iterative_scan = relaxed_order`). Without iterative scan, the filtered HNSW query returned fewer than 100 rows (an IndexError in the probe script), so the API sets it.
+
+| Query | top | 10th | 50th | 100th |
+|---|---|---|---|---|
+| xqzv flurble banana | 0.619 | 0.587 | 0.564 | 0.554 |
+| chocolate cake recipe | 0.484 | 0.467 | 0.445 | 0.436 |
+| football world cup results | 0.560 | 0.535 | 0.514 | 0.499 |
+| taylor swift concert | 0.521 | 0.457 | 0.412 | 0.400 |
+| liquid cooling | 0.804 | 0.727 | 0.642 | 0.613 |
+| GPU utilization optimization | 0.804 | 0.760 | 0.720 | 0.698 |
+| nuclear power for data centers | 0.818 | 0.769 | 0.745 | 0.730 |
+| PUE WUE | 0.692 | 0.529 | 0.498 | 0.490 |
+| hyperscaler capex | 0.717 | 0.671 | 0.644 | 0.631 |
+| submarine cables | 0.676 | 0.616 | 0.576 | 0.561 |
+
+Before the floor, `search?q=xqzv flurble banana` returned `total 100`. With `SEARCH_MIN_SIMILARITY=0.6`: `xqzv flurble banana` 2, `chocolate cake recipe` 0, `liquid cooling` 133, `PUE WUE` 3, `submarine cables` 16.
+
+### Live smoke test (uvicorn on :8011 against the live DB, final code)
+| Request | Status | Time | Result |
+|---|---|---|---|
+| `GET /api/v1/health` | 200 | 0.023066s | {"status": "ok", "db": "ok", "version": "0.1.0"} |
+| `GET /api/v1/items?page_size=1` | 200 | 0.061639s | total=2609 has_more=True mode=- first='Data Center Energy Use and Grid Impacts (Nove' published_at=2026-11-09T14:02:28Z |
+| `GET /api/v1/items?category=cooling&sort=quality&page_size=1` | 200 | 0.010828s | total=132 has_more=True mode=- first='Modeling Liquid-Cooled Data Centers in Energy' published_at=2026-10-23T17:24:37Z |
+| `GET /api/v1/items?source=arxiv&page_size=1` | 200 | 0.012034s | total=464 has_more=True mode=- first='An Optimal Power-Flow Grouping Topology for S' published_at=2026-11-06T10:56:19Z |
+| `GET /api/v1/items/471` | 200 | 0.009549s | 'The Americans Striking It Rich in the Data-Ce' coverage=1 also_covered_by=[474] |
+| `GET /api/v1/items/471/related` | 200 | 0.011037s | list of 6; first: 'Blue-Collar Jobs Are the New Flashpoint in Da' |
+| `GET /api/v1/feeds/relevant?page_size=1` | 200 | 0.017706s | total=2609 has_more=True mode=- first='The Datacenter as a Computer (2013)' published_at=2026-02-10T17:06:51Z |
+| `GET /api/v1/feeds/relevant?category=power-energy&page_size=1` | 200 | 0.011980s | total=531 has_more=True mode=- first='The Datacenter as a Computer (2013)' published_at=2026-02-10T17:06:51Z |
+| `GET /api/v1/topics` | 200 | 0.024763s | list of 14; first: 'dc-infrastructure' |
+| `GET /api/v1/topics/cooling?page_size=1` | 200 | 0.009937s | topic cooling total=132 |
+| `GET /api/v1/search?q=liquid+cooling&page_size=1` | 200 | 0.463423s | total=133 has_more=True mode=hybrid first='45°C cooling design cuts data center water us' published_at=2026-06-24T14:10:11Z |
+| `GET /api/v1/search?q=chocolate+cake+recipe` | 200 | 0.026753s | total=0 items=[] mode=hybrid |
+| `GET /api/v1/items/999999999` | 404 | 0.003605s | {"code": "not_found", "message": "item 999999999 not found", "request_id": "e59dda8225744c5d9ad6103301180920"} |
+| `GET /api/v1/items?page_size=51` | 422 | 0.002062s | {"code": "validation_error", "message": "query.page_size: Input should be less than or equal to 50", "request_id": "a97b4cac3a0a49b1a68484ca698602a1"} |
+| `GET /api/v1/docs (html)` | 200 | 0.001148s |  |
+
+Notes: the first search call (0.46 s) includes loading the embedding model. Later searches took about 25 ms. Item 471 is a canonical item with one near-duplicate (474, similarity 0.935). Its six related items were jobs/construction stories with similarity 0.73–0.79 (0.10 category boost included in the score). The first `/search?q=liquid cooling` hits were the NVIDIA 45 °C cooling design, an arXiv EnergyPlus liquid-cooling model, and a liquid-cooling overview, each with `<mark>liquid</mark> <mark>cooling</mark>` in the snippet. Response headers on a 404: `x-request-id`, `x-content-type-options: nosniff`, `content-security-policy: default-src 'none'; frame-ancestors 'none'`. Access-log line (real): `{"name": "app.access", "message": "request", "request_id": "6468e335…", "method": "GET", "path": "/api/v1/health", "status": 200, "duration_ms": 1.5, "client": "127.0.0.1", …}`.
+
+### Not run
+- `docker compose up --build` (no Docker, RISKS R-001). Compose now mounts the `models` volume on the backend too. This is untested under Docker.
+- CI on GitHub (not pushed).

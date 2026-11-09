@@ -4,6 +4,29 @@ All notable changes, grouped by build phase. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 4: Backend API (2026-11-09)
+
+#### Added
+- **Endpoints** under `/api/v1` (`backend/app/api/`): `GET /items` (filters `category`, `content_type`, `source`, `min_quality`, `from`, `to`; `sort=latest|relevance|quality`), `GET /items/{id}` (annotation, related links, `coverage` from every `item_sources` row, `also_covered_by` near-duplicates), `GET /items/{id}/related` (top 6 by cosine similarity + 0.1 per shared category), `GET /feeds/relevant` (relevance × quality), `GET /topics` (enabled categories with counts and their 3 newest items), `GET /topics/{slug}`, `GET /search` (hybrid: `websearch_to_tsquery` + `ts_rank_cd` and pgvector, merged with Reciprocal Rank Fusion; `ts_headline` snippets, HTML-escaped with `<mark>` highlights; keyword-only fallback when embeddings fail).
+- `backend/app/schemas.py`: Pydantic response models. Timestamps are always serialized as UTC with `Z`.
+- `backend/app/api/common.py`: shared session dependency, filters, `page`/`page_size` pagination (max 50) with deterministic `…, id DESC` ordering, and the processed-items query (rejected and duplicate items never appear).
+- Middleware (`backend/app/main.py`, `backend/app/security.py`): request ID (`X-Request-ID`, echoed or generated, added to every log line of the request), one JSON access-log line per request, the error envelope `{error: {code, message, request_id}}` for 404/405/422/429/500/503, security headers and an API CSP, per-IP rate limit `RATE_LIMIT_DEFAULT` (60/minute; health and ready exempt), and CORS that exposes `X-Request-ID`.
+- Migration `0003`: generated `ai_annotations.summary_tsv` with a GIN index, so search also matches the AI summary (D-029).
+- Settings / `.env.example`: `RATE_LIMIT_DEFAULT`, `SEARCH_MIN_SIMILARITY`.
+- `docs/API.md`: the endpoint contract (parameters, pagination, ordering, errors, headers).
+- Tests: `tests/test_api.py` (33, no DB: validation for every endpoint, error envelope, request ID, headers, CORS, rate limit, 500/503, OpenAPI paths, RRF, snippet escaping) and `tests/test_api_db.py` (30, real Postgres: every endpoint, every filter, sorts, pagination without skips or repeats, provenance, duplicates hidden, related ranking, topics, hybrid/semantic/keyword-fallback search, similarity floor, UTC sessions).
+
+#### Changed
+- DB sessions run with `timezone=UTC` (the local cluster defaulted to `Asia/Kolkata`).
+- `uvicorn.access` is silenced; `app.access` logs each request with its request ID.
+- Compose: the `backend` container now also mounts the `models` volume, because search embeds the query.
+- Dependencies: `slowapi` replaced by `limits` (D-030).
+
+#### Changed vs. plan (see docs/DECISIONS.md D-029 to D-031)
+- Rate limiting uses `limits` directly. With FastAPI 0.162, slowapi's middleware cannot find routes and exempted every request.
+- `sort=trending` and `/feeds/trending`, `/feeds/foryou` come in Phase 5. `/ask`, `/stats`, `/trends`, `/export` and `/admin/*` come in their own phases and are not stubbed.
+- Semantic search drops hits below cosine 0.6 (`SEARCH_MIN_SIMILARITY`). Without the floor, any query returned 100 "semantic" hits.
+
 ### Phase 3: AI processing pipeline (2026-11-09)
 
 #### Added

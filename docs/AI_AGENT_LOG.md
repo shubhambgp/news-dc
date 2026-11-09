@@ -79,3 +79,20 @@ Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
 | Spot check of 20 processed + 20 rejected items | Agent | Agent's own judgement recorded in VERIFICATION_LOG. **Human spot check pending** |
 | Docs: CHANGELOG, DECISIONS D-024–D-028, RISKS, AI_CONFIG, AI_EVALUATION, README, CLAUDE.md, .env.example, this log, VERIFICATION_LOG, PHASE_STATUS | Agent | Manual review. Pending human verification |
 | Diff review and commit | Agent | `git diff --stat`, `git status`, secret grep before commit |
+
+## Phase 4: Backend API
+
+Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
+
+| Task | Done by | How it was verified |
+|---|---|---|
+| Re-read Phase 4, §11.7, §11.9, §11.10, §11.12, §13; inspected the Phase 1–3 code and the live DB | Agent | n/a |
+| Response schemas, shared filters/pagination/base query (`app/schemas.py`, `app/api/common.py`) | Agent | `test_api_db.py` filter, sort and pagination tests. Pending human verification |
+| `/items`, `/items/{id}`, `/items/{id}/related`, `/feeds/relevant`, `/topics`, `/topics/{slug}` | Agent | DB API tests plus the live smoke test on 2,609 real items. Pending human verification |
+| Hybrid search (FTS + pgvector + RRF, snippets, keyword fallback), migration 0003 | Agent | DB API tests; similarity floor measured on 10 live queries (VERIFICATION_LOG). Pending human verification |
+| Error envelope, request ID, access log, security headers, CORS | Agent | `test_api.py`; live curl. Pending human verification |
+| Rate limiting: found slowapi exempting every route under FastAPI 0.162; replaced with `limits` | Agent | 62 live requests before (62 × 200) and after (60 × 200, then 429s); `test_rate_limit_returns_429_envelope_and_spares_health`. Pending human verification |
+| Found the API depending on the session timezone (`Asia/Kolkata` locally) and `/feeds/relevant` ignoring `category` | Agent | Found by failing DB tests; fixed; the tests now pass |
+| Docs: API.md, DECISIONS D-029 to D-031, RISKS R-017, CHANGELOG, CLAUDE.md | Agent | Pending human review |
+| Try the API (e.g. `/api/v1/docs`, a search, an article detail) | Human | **Pending human verification** |
+

@@ -174,3 +174,30 @@ Each entry: context, options, decision, why, trade-offs, and whether it changes 
 - **Decision:** `classify-v2` rates title-only items by how specific the headline is (concrete factual headline 45–60, vague or clickbait below 40, never above 60). Run 2: precision 20/22, recall 20/20.
 - **Caveat:** the same 40 items informed the change and measured it. There is no held-out set, so run 2 is optimistic. Both runs are recorded in AI_EVALUATION.md.
 - **Changes plan:** no.
+
+## D-029 (2026-11-09): Hybrid search details
+- **Summary in full-text search (resolves D-013):** migration `0003` adds a generated `ai_annotations.summary_tsv` (summary, weight B) with a GIN index. Search matches `items.tsv @@ q OR ai_annotations.summary_tsv @@ q` and ranks by `ts_rank_cd(items.tsv || summary_tsv, q)`. Most Hacker News items are title-only, so without the summary their only searchable text is the headline. Tags are not indexed, because `array_to_string` is not IMMUTABLE and so can't go in a generated column.
+- **Fusion:** keyword and semantic retrievers each return up to 100 candidates (same filters), merged with Reciprocal Rank Fusion (`Σ 1/(60 + rank)`; ties broken by id DESC). `total` is the size of the fused list, so pagination beyond about 200 hits isn't possible. That is enough for a discovery UI.
+- **Similarity floor:** nearest-neighbour search always returns something, so a nonsense query got 100 "semantic" hits. Measured on the live corpus (VERIFICATION_LOG Phase 4): off-topic queries top out at 0.48–0.62 cosine, and on-topic queries keep dozens of hits above 0.6. `SEARCH_MIN_SIMILARITY=0.6` (env) drops the rest. It is specific to bge-small and this corpus, so re-measure if either changes.
+- **Snippets:** `ts_headline` over summary → description → title, using private-use characters as match markers. The API HTML-escapes the text and then turns the markers into `<mark>`, so `snippet` contains no markup except `<mark>`.
+- **Degraded mode:** if the query embedding fails, search runs keyword-only and the response says `mode: "keyword"` (§11.5).
+- **Changes plan:** no (D-013 said Phase 4 would revisit this).
+
+## D-030 (2026-11-09): Rate limiting with `limits`, not slowapi's middleware
+- **Context:** the plan names `slowapi`. With FastAPI 0.162, `SlowAPIMiddleware` looks for the route by scanning `app.routes` for an `endpoint` attribute. Included routers are now wrapped in `_IncludedRouter` objects that have none, so slowapi found no handler and **exempted every request**: 62 requests in a row returned 200 in the live check.
+- **Decision:** drop `slowapi` and use `limits` (the library slowapi is built on) in a small middleware: moving window, in-memory, keyed by client IP, `RATE_LIMIT_DEFAULT=60/minute`, health/ready exempt. It runs inside CORS so the browser can read a 429. `app.security.allow(client, limit, scope)` takes a per-route limit for `/ask` (Phase 6) and admin login (Phase 8).
+- **Trade-offs:** counts are per process (a single uvicorn process in this deployment). Behind Caddy, uvicorn needs `--proxy-headers` so the key is the client IP and not the proxy's (Phase 10; RISKS R-017).
+- **Changes plan:** minor (library choice, recorded in CHANGELOG).
+
+## D-031 (2026-11-09): Phase 4 API contract choices
+- **Scope:** Phase 4 creates `/items`, `/items/{id}`, `/items/{id}/related`, `/feeds/relevant`, `/topics`, `/topics/{slug}` and `/search`. Endpoints whose logic belongs to later phases are not stubbed: `/feeds/trending` and `/feeds/foryou` (Phase 5), `/ask` (6), `/stats` and `/trends` (7), `/export` and `/admin/*` (8). `sort=trending` on `/items` returns 422 until Phase 5 adds the trending score.
+- **Pagination:** `page` (1–1000) and `page_size` (1–50, default 20) with `total` and `has_more`. Every ordering ends with `id DESC` (latest: `published_at DESC NULLS LAST, id DESC`), so pages don't skip or repeat while the data is unchanged. Offset pagination was chosen over cursors because the plan allows either and the UI needs page numbers and totals.
+- **`/feeds/relevant`:** `relevance_score × quality_score DESC`, then newest first, as the Phase 4 table says. Phase 5 replaces it with `0.6·relevance + 0.4·quality` plus recency decay.
+- **Filters:** `category` matches any of an item's categories, not only the primary one. `source` matches any source that found the item (`item_sources`). `from` is inclusive and `to` exclusive. A timestamp without an offset is taken as UTC. Slugs and keys are validated by format, so a well-formed unknown slug returns an empty list (`/topics/{slug}` returns 404).
+- **Detail:** only `processed` items have a public detail page. Rejected, failed and duplicate items return 404 (§11.13). A near-duplicate appears under its canonical item's `also_covered_by`. `coverage` lists every `item_sources` row (§11.2). `url` is the original URL. `content_text` (full article text) is never returned (§11.6).
+- **Related:** cosine similarity over the 50 nearest processed items, plus 0.1 per shared category, top 6. An item without an embedding gets `[]`.
+- **Timestamps:** serialized as UTC with a `Z` suffix by the response schemas, whatever the session timezone. DB sessions also run with `timezone=UTC`. The local cluster defaulted to `Asia/Kolkata`, which is how this was found.
+- **Errors:** every non-2xx response is `{"error": {"code", "message", "request_id"}}`. Codes: `validation_error` 422, `not_found` 404, `method_not_allowed` 405, `rate_limited` 429, `db_unavailable` 503 (SQLAlchemy `OperationalError`), `internal_error` 500 (no details leak). `X-Request-ID` is echoed if it is safe (`[A-Za-z0-9._-]{1,64}`) or generated, and is in every log line of the request.
+- **Request bodies:** no Phase 4 endpoint accepts one. The body-size limit is added with the first POST endpoint (`/feeds/foryou`, Phase 5).
+- **Headers:** `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and `CSP default-src 'none'; frame-ancestors 'none'` on API responses. The Swagger UI page is exempt from the CSP, because it loads a CDN script. The frontend's CSP belongs to Caddy (Phase 10).
+- **Changes plan:** no.
