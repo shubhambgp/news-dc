@@ -167,7 +167,7 @@ Rules:
 |---|---|---|
 | 1 Design system | 0 | `src/index.css`, `src/components/ui/*` (button, badge, card, new input, tooltip, dropdown, segmented), `src/components/common.tsx`, `src/lib/category.ts`, `index.html` (theme-color), `public/theme-init.js` (no-flash theme, external file so it fits `script-src 'self'`), `docs/UI_DESIGN_SYSTEM.md` |
 | 2 Shell | 1 | `src/components/Layout.tsx` (grid shell, rail, sidebar, header, mobile bar, drawer), `index.html` (`viewport-fit=cover`) |
-| 3 Home | 1, 2 | `src/pages/Home.tsx`, new `src/components/article/` (`FeaturedCard`, `ArticleCard` = today's `ItemCard`, `ArticleRow`, `TrendingRail`), `ItemCard.tsx` re-export |
+| 3 Home | 1, 2 | `src/pages/Home.tsx`, new `src/components/ArticleCards.tsx` (`FeaturedCard`, `ArticleRow`, `TrendingRail`; one file instead of a folder), `ItemCard.tsx` stays the standard card, new `src/components/SearchBox.tsx` |
 | 4 Discovery | 3 | `src/pages/Feeds.tsx` (Trending, Relevant, Topic), `src/pages/Search.tsx`, `src/components/Feed.tsx` (filter toolbar, card/list view toggle) |
 | 5 Topics, Bookmarks | 3, 4 | `src/pages/Feeds.tsx` (`TopicsPage`), `src/pages/Bookmarks.tsx` (client-side filters over the stored bookmarks; storage logic untouched) |
 | 6 Article, Ask | 3 | `src/pages/Article.tsx`, `src/pages/Ask.tsx`, `src/components/Markdown.tsx` (styles only) |

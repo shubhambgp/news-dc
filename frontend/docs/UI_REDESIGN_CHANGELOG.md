@@ -107,3 +107,37 @@ Frontend only (`frontend/`). One entry per phase; plan in `UI_REDESIGN_PLAN.md`.
   - Page bodies are unchanged (Phases 3–7).
   - The home hero tiles stretch at 2560 px (Phase 3).
   - Dashboard overflow at 320 px (Phase 7).
+
+## Phase 3: homepage (2026-11-11)
+
+- **Status:** done, pending human review.
+- **Files:**
+  - `src/pages/Home.tsx`: rewritten.
+  - `src/components/ArticleCards.tsx`: new `FeaturedCard`, `ArticleRow`, `TrendingRail`.
+  - `src/components/SearchBox.tsx`: new; moved out of `Layout.tsx`, with an `id` prop and a large variant.
+  - `src/components/Layout.tsx`: on the phone home page the header shows the brand instead of the search box; the sidebar reserves the categories' height while they load.
+  - `src/components/Feed.tsx`: new `auto` prop. `false` means load more by button only.
+- **Order** (the brief's): welcome line and live tiles → search (phones; desktop uses the header) → compact onboarding → featured story → AI briefing → Trending now → For You → Explore topics → Latest research.
+- **Choices:**
+  - **For You on home is not infinite:** 12 cards plus "Load more". The brief puts sections after it, and those can't be reached below an infinite feed.
+  - **Right panel from 1280 px:** Your interests, Explore topics (with "Updated X ago" per topic) and Latest research (`/items?content_type=research`). Below 1280 px, the topics and research sections follow the feed, and "Your interests" is a pop-over next to the For You title.
+  - **Onboarding:** one row of chips with category icons, scrolling with a fade at the edge, at every width. Phones put the buttons under the chips.
+  - **Welcome tiles:** one row that scrolls on phones (was 2×2). The labels are shorter ("vs last week") and no longer truncate at 375 px.
+  - **Briefing slot:**
+    - When a weekly brief exists, it shows a violet "AI-generated" teaser: plain text from `content_md`, citations and Markdown stripped, rendered as text.
+    - Otherwise it shows "Rising this week" from `/trends`, labelled as computed from tags and companies, with links to search. That is the case on the live site today.
+    - No fake or hardcoded data anywhere: every number and item comes from the API.
+- **Checks:**
+  - lint, typecheck, Vitest 10, build: pass. Main JS 115.6 kB gzip.
+  - Playwright: 2 out of 2 passed.
+  - Screenshots: home at 7 sizes in both themes, then at 320/375/1024/1440/1920 in both themes after the fixes. No overflow, no blank page.
+  - **CLS, desktop (Lighthouse `--preset=desktop`):** 0.224 at first, now **0.002**. Causes, found with `layout-shift` entries and a height comparison between loading and loaded:
+    - the onboarding chips wrapped to 2–3 rows after load
+    - skeletons shorter than the content (featured, trending rail, signals)
+    - the aside's "Explore topics" appearing late
+    - the sidebar's categories pushing "Admin" down
+  - Desktop performance 96–97 (was 86), `/trending` 98.
+  - Mobile: performance 100, accessibility 100, CLS 0, LCP 0.9 s. Machine load varied during this phase: the E2E time halved in the same run (8.5 s → 4.6 s), so the mobile TBT (60–70 ms, against 330–450 earlier) is not a like-for-like gain.
+- **Remaining:**
+  - The featured story is usually also the first For You card (both rank by trending). Removing it would mean filtering the server's ranking on the client; left as is.
+  - Under the onboarding row, the native scrollbar shows on desktop.

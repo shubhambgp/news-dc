@@ -72,12 +72,13 @@ type FeedProps<T extends ItemSummary> = {
   fetchPage: (page: number) => Promise<Page<T>>
   render?: (item: T) => ReactNode
   empty?: ReactNode
-  pageSize?: number
+  /** false: no auto-load on scroll, only the button (the home feed has sections below it). */
+  auto?: boolean
 }
 
 /** An infinite list: IntersectionObserver loads the next page, with a "Load more" button as the
  * fallback. Items marked "Not interested" disappear immediately. */
-export function Feed<T extends ItemSummary>({ queryKey, fetchPage, render, empty }: FeedProps<T>) {
+export function Feed<T extends ItemSummary>({ queryKey, fetchPage, render, empty, auto = true }: FeedProps<T>) {
   const { profile } = useProfileState()
   const q = useInfiniteQuery({
     queryKey,
@@ -90,7 +91,7 @@ export function Feed<T extends ItemSummary>({ queryKey, fetchPage, render, empty
 
   useEffect(() => {
     const el = sentinel.current
-    if (!el || !hasNextPage) return
+    if (!el || !hasNextPage || !auto) return
     const io = new IntersectionObserver(
       ([e]) => {
         if (e.isIntersecting && !isFetchingNextPage) fetchNextPage()
@@ -99,7 +100,7 @@ export function Feed<T extends ItemSummary>({ queryKey, fetchPage, render, empty
     )
     io.observe(el)
     return () => io.disconnect()
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, auto])
 
   if (q.isPending) return <CardSkeleton />
   if (q.isError) return <ErrorState error={q.error} retry={() => q.refetch()} />

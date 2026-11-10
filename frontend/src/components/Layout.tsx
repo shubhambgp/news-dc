@@ -9,19 +9,18 @@ import {
   MessageCircleQuestion,
   Monitor,
   Moon,
-  Search,
   ShieldCheck,
   Star,
   Sun,
   X,
 } from 'lucide-react'
-import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { Suspense, useCallback, useEffect, useRef } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router'
 
 import { ListSkeleton } from '@/components/common'
 import { categoryLook } from '@/lib/category'
 import { Button } from '@/components/ui/button'
-import { fieldClass } from '@/components/ui/input'
+import { SearchBox } from '@/components/SearchBox'
 import { Tip } from '@/components/ui/tooltip'
 import { useCategories } from '@/lib/format'
 import { useTheme, type Theme } from '@/lib/theme'
@@ -151,36 +150,6 @@ function useShortcuts(openHelp: () => void) {
   }, [navigate, setTheme, openHelp])
 }
 
-/** Remounted (via `key`) when the URL's query changes, so the box shows the current search. */
-function SearchBox({ initial }: { initial: string }) {
-  const navigate = useNavigate()
-  const [q, setQ] = useState(initial)
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    if (q.trim()) navigate(`/search?q=${encodeURIComponent(q.trim())}`)
-  }
-  return (
-    <form role="search" onSubmit={submit} className="relative w-full min-w-0 lg:max-w-2xl">
-      <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-      <label htmlFor="site-search" className="sr-only">
-        Search NewsDC
-      </label>
-      <input
-        id="site-search"
-        type="search"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        maxLength={200}
-        placeholder="Search news, research, companies…"
-        className={cn(fieldClass, 'h-10 rounded-full bg-elevated/60 pr-9 pl-9 shadow-none hover:bg-surface focus-visible:bg-surface')}
-      />
-      <kbd className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 rounded border bg-surface px-1.5 font-mono text-2xs text-muted-foreground md:block">
-        /
-      </kbd>
-    </form>
-  )
-}
-
 const navLink = ({ isActive }: { isActive: boolean }) =>
   cn(
     'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-foreground/80 transition-colors hover:bg-elevated hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none lg:py-1.5',
@@ -193,7 +162,7 @@ function GroupTitle({ children }: { children: string }) {
 
 /** Full navigation: the desktop sidebar (≥ 1024 px) and the phone drawer. */
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { topics } = useCategories()
+  const { topics, query } = useCategories()
   return (
     <nav aria-label="Main" className="flex min-h-full flex-col gap-5">
       {NAV_GROUPS.map(([group, items]) => (
@@ -211,6 +180,8 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </ul>
         </div>
       ))}
+      {/* Reserve the list's height while categories load, so nothing below jumps (CLS). */}
+      {query.isPending && <div className="h-[31rem]" aria-hidden />}
       {topics.length > 0 && (
         <div>
           <GroupTitle>Categories</GroupTitle>
@@ -274,6 +245,7 @@ export function Layout() {
   const { pathname } = useLocation()
   const [sp] = useSearchParams()
   const urlQ = pathname === '/search' ? (sp.get('q') ?? '') : ''
+  const home = pathname === '/'
   const openHelp = useCallback(() => help.current?.showModal(), [])
   useShortcuts(openHelp)
 
@@ -303,9 +275,15 @@ export function Layout() {
             </span>
             <span className="sr-only lg:hidden">NewsDC home</span>
           </Link>
-          <div className="flex min-w-0 flex-1 md:px-6 lg:px-8">
-            <SearchBox key={urlQ} initial={urlQ} />
+          <div className={cn('flex min-w-0 flex-1 md:px-6 lg:px-8', home && 'max-md:hidden')}>
+            <SearchBox key={urlQ} id="site-search" initial={urlQ} />
           </div>
+          {home && (
+            <span className="flex-1 leading-tight md:hidden">
+              <span className="block text-base font-bold tracking-tight">NewsDC</span>
+              <span className="block text-2xs font-medium text-muted-foreground">Data Center Intelligence</span>
+            </span>
+          )}
           <div className="flex items-center gap-1 md:pr-4 lg:pr-6">
             <Button asChild variant="ai" size="sm" className="hidden sm:inline-flex">
               <Link to="/ask">

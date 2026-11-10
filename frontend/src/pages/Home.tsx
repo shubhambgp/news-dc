@@ -1,68 +1,51 @@
 import { useQuery } from '@tanstack/react-query'
-import { Activity, ArrowRight, Check, Compass, Flame, Layers, Newspaper, RotateCcw, Sparkles, type LucideIcon } from 'lucide-react'
-import { useState } from 'react'
+import {
+  Activity,
+  ArrowRight,
+  Check,
+  Compass,
+  FlaskConical,
+  Flame,
+  Layers,
+  Newspaper,
+  RotateCcw,
+  Sparkles,
+  TrendingUp,
+  type LucideIcon,
+} from 'lucide-react'
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 
+import { ArticleRow, FeaturedCard, TrendingRail } from '@/components/ArticleCards'
 import { Feed } from '@/components/Feed'
 import { ItemCard } from '@/components/ItemCard'
-import { Cover, PageHeader, Skeleton, WithAside } from '@/components/common'
-import { categoryLook } from '@/lib/category'
+import { SearchBox } from '@/components/SearchBox'
+import { Skeleton, WithAside } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { api, type ForYouItem } from '@/lib/api'
+import { categoryLook } from '@/lib/category'
 import { timeAgo, useCategories, useTitle } from '@/lib/format'
 import { profileStore, toRequest, useProfileState } from '@/lib/profile'
 import { cn } from '@/lib/utils'
 
-function TopicPicker() {
-  const { topics, query } = useCategories()
-  const [picked, setPicked] = useState<string[]>([])
-  const toggle = (s: string) => setPicked((p) => (p.includes(s) ? p.filter((x) => x !== s) : [...p, s]))
+function SectionTitle({ id, icon: Icon, iconClass, children, to, linkLabel }: { id: string; icon: LucideIcon; iconClass?: string; children: ReactNode; to?: string; linkLabel?: string }) {
   return (
-    <section aria-labelledby="pick-title" className="mb-6 rounded-lg border bg-surface p-4">
-      <h2 id="pick-title" className="font-semibold">
-        What do you want to follow?
+    <div className="mb-3 flex items-center gap-2">
+      <Icon className={cn('size-4', iconClass ?? 'text-primary')} aria-hidden />
+      <h2 id={id} className="text-lg font-semibold tracking-tight">
+        {children}
       </h2>
-      <p className="mb-3 text-sm text-muted-foreground">
-        Pick a few topics. Your choices and reading history stay in this browser; there is no account.
-      </p>
-      {query.isPending ? (
-        <Skeleton className="h-20" />
-      ) : (
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Topics">
-          {topics.map((t) => {
-            const on = picked.includes(t.slug)
-            return (
-              <button
-                key={t.slug}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggle(t.slug)}
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                  on ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent',
-                )}
-              >
-                {on && <Check className="size-3.5" aria-hidden />}
-                {t.name}
-              </button>
-            )
-          })}
-        </div>
+      {to && (
+        <Link to={to} className="ml-auto inline-flex items-center gap-0.5 rounded text-xs font-medium text-primary-ink hover:underline">
+          {linkLabel} <ArrowRight className="size-3" aria-hidden />
+        </Link>
       )}
-      <div className="mt-4 flex gap-2">
-        <Button size="sm" disabled={!picked.length} onClick={() => profileStore.setTopics(picked)}>
-          Show my feed{picked.length ? ` (${picked.length})` : ''}
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => profileStore.setTopics([])}>
-          Skip
-        </Button>
-      </div>
-    </section>
+    </div>
   )
 }
 
-/** Headline and live numbers from `/stats`. Tiles hide if stats fail; the feed still works. */
-function Hero() {
+/** One-line welcome with live numbers from `/stats`. Tiles hide if stats fail; the feed still works. */
+function Welcome() {
   const stats = useQuery({ queryKey: ['stats'], queryFn: api.stats, staleTime: 5 * 60_000 })
   const { topics } = useCategories()
   const s = stats.data
@@ -74,31 +57,31 @@ function Hero() {
     ? [
         [Newspaper, s.funnel.processed.toLocaleString(), 'Articles'],
         [Layers, String(topics.length || 14), 'Topics'],
-        [Activity, change == null ? last7.toLocaleString() : `${change > 0 ? '+' : ''}${change}%`, change == null ? 'Last 7 days' : '7-day activity'],
+        [Activity, change == null ? last7.toLocaleString() : `${change > 0 ? '+' : ''}${change}%`, change == null ? 'This week' : 'vs last week'],
         [Sparkles, `$${s.ai_cost.total_usd.toFixed(2)}`, 'AI cost'],
       ]
     : []
   return (
-    <section aria-labelledby="hero-title" className="hero-glow mb-6 rounded-2xl border bg-surface/60 p-5 sm:p-6">
-      <p id="hero-title" className="text-2xl leading-tight font-bold tracking-tight sm:text-3xl">
-        Your AI-powered <span className="text-primary">Data Center Intelligence.</span>
-      </p>
-      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        News, research and engineering on infrastructure, AI compute, power, cooling and sustainability, filtered and summarized by AI.
-      </p>
+    <section aria-labelledby="welcome-title" className="hero-glow mb-5 flex flex-col gap-4 rounded-2xl border bg-surface/70 p-4 sm:p-5 2xl:flex-row 2xl:items-center 2xl:justify-between">
+      <div className="min-w-0">
+        <p id="welcome-title" className="text-xl leading-tight font-bold tracking-tight text-balance sm:text-2xl">
+          Your AI-powered <span className="text-primary">Data Center Intelligence</span>
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Infrastructure, AI compute, power, cooling and sustainability, filtered and summarized by AI.</p>
+      </div>
       {stats.isPending ? (
-        <Skeleton className="mt-4 h-[8.25rem] sm:h-16" />
+        <Skeleton className="h-14 2xl:w-[34rem]" />
       ) : (
         tiles.length > 0 && (
-          <ul aria-label="NewsDC in numbers" className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <ul aria-label="NewsDC in numbers" className="-mx-4 flex shrink-0 gap-2 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-4 sm:px-0 2xl:w-[34rem]">
             {tiles.map(([Icon, value, label]) => (
-              <li key={label} className="flex items-center gap-3 rounded-xl border bg-background/60 p-3">
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/12 text-primary" aria-hidden>
+              <li key={label} className="flex min-w-36 shrink-0 items-center gap-2.5 rounded-xl border bg-background/60 px-3 py-2.5 sm:min-w-0">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/12 text-primary" aria-hidden>
                   <Icon className="size-4" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-base leading-tight font-semibold tabular-nums">{value}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{label}</span>
+                  <span className="block text-[15px] leading-tight font-semibold tabular-nums">{value}</span>
+                  <span className="block text-2xs whitespace-nowrap text-muted-foreground">{label}</span>
                 </span>
               </li>
             ))}
@@ -109,122 +92,234 @@ function Hero() {
   )
 }
 
-/** The weekly trend brief (Phase 7) as a banner; hidden when there is none. */
-function Briefing() {
-  const q = useQuery({ queryKey: ['trends'], queryFn: api.trends, staleTime: 10 * 60_000 })
-  const brief = q.data?.brief
-  if (!brief) return null
+/** First visit: one compact row of topic chips (scrolls on small screens). */
+function TopicPicker() {
+  const { topics, query } = useCategories()
+  const [picked, setPicked] = useState<string[]>([])
+  const toggle = (s: string) => setPicked((p) => (p.includes(s) ? p.filter((x) => x !== s) : [...p, s]))
   return (
-    <Link
-      to="/dashboard"
-      className="group mb-6 flex items-center gap-4 rounded-2xl border border-ai/30 bg-ai/8 p-4 hover:border-ai/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-    >
-      <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-ai text-ai-foreground" aria-hidden>
-        <Sparkles className="size-5" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block font-semibold">AI weekly briefing</span>
-        <span className="block truncate text-sm text-muted-foreground">
-          Top moves and rising topics, written {timeAgo(brief.created_at)} from {brief.sources.length} sources.
-        </span>
-      </span>
-      <span className="hidden shrink-0 items-center gap-1 rounded-full bg-ai px-3 py-1.5 text-xs font-medium text-ai-foreground sm:inline-flex">
-        View briefing <ArrowRight className="size-3.5 transition group-hover:translate-x-0.5" aria-hidden />
-      </span>
-    </Link>
-  )
-}
-
-/** #1 trending as a featured card, the rest as a horizontal strip. */
-function TrendingStrip() {
-  const q = useQuery({ queryKey: ['trending-strip'], queryFn: () => api.trending({ page_size: 9 }) })
-  const { name } = useCategories()
-  if (q.isError) return null
-  const [top, ...rest] = q.data?.items ?? []
-  return (
-    <section aria-labelledby="strip-title" className="mb-6">
-      {q.isPending ? (
-        <Skeleton className="mb-6 h-80 rounded-2xl md:h-48" />
+    <section aria-labelledby="pick-title" className="mb-6 rounded-2xl border bg-surface p-4 shadow-card">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
+          <h2 id="pick-title" className="font-semibold">
+            What do you want to follow?
+          </h2>
+          <p className="text-xs text-muted-foreground">Your choices and reading history stay in this browser; there is no account.</p>
+        </div>
+        <div className="order-last flex shrink-0 gap-2 sm:order-none">
+          <Button size="sm" disabled={!picked.length} onClick={() => profileStore.setTopics(picked)}>
+            Show my feed{picked.length ? ` (${picked.length})` : ''}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => profileStore.setTopics([])}>
+            Skip
+          </Button>
+        </div>
+      {query.isPending ? (
+        <Skeleton className="h-10 basis-full" />
       ) : (
-        top && (
-          <article className="group relative mb-6 grid overflow-hidden rounded-2xl border bg-surface transition hover:border-primary/40 md:grid-cols-[2fr_3fr]">
-            <Cover slug={top.primary_category} className="min-h-36" iconClass="size-36 -right-4 -bottom-6">
-              <span className="absolute top-3 left-3 z-10 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-2xs font-semibold text-primary-foreground">
-                <Flame className="size-3" aria-hidden /> Top story
-              </span>
-            </Cover>
-            <div className="flex flex-col justify-center p-5">
-              {top.primary_category && <p className="text-xs font-medium text-primary">{name(top.primary_category)}</p>}
-              <h2 className="mt-1 text-lg leading-snug font-bold sm:text-xl">
-                <Link to={`/article/${top.id}`} className="after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none">
-                  {top.title}
-                </Link>
-              </h2>
-              {top.summary && <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{top.summary}</p>}
-              <p className="mt-3 text-xs text-muted-foreground">
-                {top.publisher ?? top.source?.name} · {timeAgo(top.published_at)}
-              </p>
-            </div>
-          </article>
-        )
+        <div className="-mx-4 flex basis-full gap-2 overflow-x-auto px-4 pb-1 [mask-image:linear-gradient(to_right,black_92%,transparent)]" role="group" aria-label="Topics">
+          {topics.map((t) => {
+            const on = picked.includes(t.slug)
+            const { Icon, style } = categoryLook(t.slug)
+            return (
+              <button
+                key={t.slug}
+                type="button"
+                aria-pressed={on}
+                onClick={() => toggle(t.slug)}
+                style={style}
+                className={cn(
+                  'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                  on ? 'border-primary bg-primary text-primary-foreground' : 'bg-surface hover:bg-elevated',
+                )}
+              >
+                {on ? <Check className="size-3.5" aria-hidden /> : <Icon className="size-3.5 text-[oklch(0.62_0.15_var(--h))]" aria-hidden />}
+                {t.name}
+              </button>
+            )
+          })}
+        </div>
       )}
-      <h2 id="strip-title" className="mb-3 flex items-center gap-1.5 font-semibold">
-        <Flame className="size-4 text-orange-500" aria-hidden /> Trending now
-        <Link to="/trending" className="ml-auto inline-flex items-center gap-0.5 text-xs font-medium text-primary hover:underline">
-          See all <ArrowRight className="size-3" aria-hidden />
-        </Link>
-      </h2>
-      <ol className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2">
-        {q.isPending
-          ? Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-44 w-60 shrink-0 rounded-xl" />)
-          : rest.map((i, n) => (
-              <li key={i.id} className="relative w-60 shrink-0 snap-start overflow-hidden rounded-xl border bg-surface transition hover:border-primary/40">
-                <Cover slug={i.primary_category} className="h-20" iconClass="size-14">
-                  <span className="absolute top-2 left-2 z-10 grid size-6 place-items-center rounded-md bg-black/45 text-xs font-bold text-white">{n + 2}</span>
-                </Cover>
-                <div className="p-3">
-                  <Link to={`/article/${i.id}`} className="line-clamp-2 text-sm leading-snug font-semibold after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none">
-                    {i.title}
-                  </Link>
-                  <p className="mt-1.5 truncate text-xs text-muted-foreground">
-                    {i.publisher ?? i.source?.name} · {timeAgo(i.published_at)}
-                  </p>
-                </div>
-              </li>
-            ))}
-      </ol>
+      </div>
     </section>
   )
 }
 
-function ExploreTopics() {
-  const { topics } = useCategories()
-  if (!topics.length) return null
+/** Markdown brief → one plain-text line for the teaser (rendered as text, never as HTML). */
+const teaser = (md: string) =>
+  md
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/\[\d+\]/g, '')
+    .split('\n')
+    .map((l) => l.replace(/^[#>*\-\s\d.]+/, '').replace(/[*_`]/g, '').trim())
+    .find((l) => l.length > 40) ?? ''
+
+/** The weekly AI brief (Phase 7) when there is one; otherwise this week's rising terms from
+ * `/trends` (computed from tags, not AI-written, and labelled so). Hidden if neither exists. */
+function Briefing() {
+  const q = useQuery({ queryKey: ['trends'], queryFn: api.trends, staleTime: 10 * 60_000 })
+  if (q.isPending) return <Skeleton className="mb-6 h-56 rounded-2xl sm:h-52" />
+  const brief = q.data?.brief
+  if (brief)
+    return (
+      <Link
+        to="/dashboard"
+        className="ai-block group mb-6 flex items-start gap-4 rounded-2xl border border-ai/25 p-4 transition-colors hover:border-ai/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:p-5"
+      >
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-ai text-ai-foreground" aria-hidden>
+          <Sparkles className="size-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-baseline gap-x-2">
+            <span className="font-semibold">Weekly AI briefing</span>
+            <span className="text-xs text-muted-foreground">
+              AI-generated · {brief.sources.length} sources · {timeAgo(brief.created_at)}
+            </span>
+          </span>
+          <span className="mt-1 line-clamp-2 block text-sm text-foreground/85">{teaser(brief.content_md)}</span>
+          <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-ai-ink">
+            Read the briefing <ArrowRight className="size-3 transition group-hover:translate-x-0.5" aria-hidden />
+          </span>
+        </span>
+      </Link>
+    )
+  const rising = [...(q.data?.tags ?? []), ...(q.data?.companies ?? [])].sort((a, b) => b.change_pct - a.change_pct).slice(0, 8)
+  if (!rising.length) return null
   return (
-    <section aria-labelledby="explore-title" className="mb-6">
-      <h2 id="explore-title" className="mb-3 flex items-center gap-1.5 font-semibold">
-        <Layers className="size-4 text-primary" aria-hidden /> Explore topics
-        <Link to="/topics" className="ml-auto inline-flex items-center gap-0.5 text-xs font-medium text-primary hover:underline">
-          All topics <ArrowRight className="size-3" aria-hidden />
+    <section aria-labelledby="signals-title" className="mb-6 rounded-2xl border bg-surface p-4 shadow-card sm:p-5">
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-2">
+        <h2 id="signals-title" className="flex items-center gap-2 font-semibold">
+          <TrendingUp className="size-4 text-data" aria-hidden /> Rising this week
+        </h2>
+        <span className="text-xs text-muted-foreground">Tags and companies, last 7 days vs the 4 weeks before. The weekly AI briefing appears here on Mondays.</span>
+        <Link to="/dashboard" className="ml-auto inline-flex items-center gap-0.5 text-xs font-medium text-primary-ink hover:underline">
+          All signals <ArrowRight className="size-3" aria-hidden />
         </Link>
-      </h2>
-      <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2">
-        {topics.map((t) => {
-          const { Icon, style } = categoryLook(t.slug)
-          return (
-            <li key={t.slug} className="shrink-0">
-              <Link
-                to={`/topics/${t.slug}`}
-                style={style}
-                className="inline-flex items-center gap-1.5 rounded-full border bg-surface px-3 py-1.5 text-sm whitespace-nowrap hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-              >
-                <Icon className="size-4 text-[oklch(0.62_0.15_var(--h))]" aria-hidden />
-                {t.name}
-              </Link>
-            </li>
-          )
-        })}
+      </div>
+      <ul className="flex flex-wrap gap-2">
+        {rising.map((t) => (
+          <li key={t.term}>
+            <Link
+              to={`/search?q=${encodeURIComponent(t.term)}`}
+              className="inline-flex items-center gap-1.5 rounded-full border bg-background/60 px-3 py-1 text-sm hover:bg-elevated focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              {t.term}
+              <span className="text-2xs font-semibold text-success-ink tabular-nums">{t.new ? 'new' : `+${Math.round(t.change_pct)}%`}</span>
+            </Link>
+          </li>
+        ))}
       </ul>
+    </section>
+  )
+}
+
+/** #1 trending as the featured story, the next eight as a numbered rail. */
+function Trending() {
+  const q = useQuery({ queryKey: ['trending-strip'], queryFn: () => api.trending({ page_size: 9 }) })
+  if (q.isError) return null
+  const [top, ...rest] = q.data?.items ?? []
+  return (
+    <>
+      <div className="mb-6">{q.isPending ? <Skeleton className="h-96 rounded-2xl md:h-64" /> : top && <FeaturedCard item={top} />}</div>
+      <section aria-labelledby="strip-title" className="mb-8">
+        <SectionTitle id="strip-title" icon={Flame} iconClass="text-orange-500" to="/trending" linkLabel="See all">
+          Trending now
+        </SectionTitle>
+        {q.isPending ? (
+          <div className="flex gap-3 overflow-hidden">
+            {Array.from({ length: 4 }, (_, i) => (
+              <Skeleton key={i} className="h-[10.75rem] w-64 shrink-0 rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          <TrendingRail items={rest} start={2} />
+        )}
+      </section>
+    </>
+  )
+}
+
+function ExploreTopics({ layout }: { layout: 'chips' | 'list' }) {
+  const { topics, query } = useCategories()
+  if (query.isPending) return <Skeleton className={layout === 'chips' ? 'mb-8 h-20' : 'h-[48rem] rounded-2xl'} />
+  if (!topics.length) return null
+  const id = `explore-${layout}`
+  return (
+    <section aria-labelledby={id} className={layout === 'chips' ? 'mb-8' : 'rounded-2xl border bg-surface p-4 shadow-card'}>
+      <SectionTitle id={id} icon={Layers} to="/topics" linkLabel="All topics">
+        Explore topics
+      </SectionTitle>
+      {layout === 'chips' ? (
+        <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-wrap lg:px-0">
+          {topics.map((t) => {
+            const { Icon, style } = categoryLook(t.slug)
+            return (
+              <li key={t.slug} className="shrink-0">
+                <Link
+                  to={`/topics/${t.slug}`}
+                  style={style}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full border bg-surface px-3 text-sm whitespace-nowrap hover:bg-elevated focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <Icon className="size-4 text-[oklch(0.62_0.15_var(--h))]" aria-hidden />
+                  {t.name}
+                  <span className="text-2xs text-muted-foreground tabular-nums">{t.item_count}</span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        <ul className="-mx-2 space-y-0.5">
+          {topics.map((t) => {
+            const { Icon, style } = categoryLook(t.slug)
+            const latest = t.latest[0]?.published_at
+            return (
+              <li key={t.slug}>
+                <Link
+                  to={`/topics/${t.slug}`}
+                  style={style}
+                  className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-elevated focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <span className="grid size-7 shrink-0 place-items-center rounded-md bg-[oklch(0.62_0.15_var(--h)/0.14)]" aria-hidden>
+                    <Icon className="size-4 text-[oklch(0.62_0.15_var(--h))]" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{t.name}</span>
+                    {latest && <span className="block text-2xs text-muted-foreground">Updated {timeAgo(latest)}</span>}
+                  </span>
+                  <span className="text-xs text-muted-foreground tabular-nums">{t.item_count}</span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+/** Newest research items (existing `/items?content_type=research`). */
+function LatestResearch({ layout }: { layout: 'grid' | 'list' }) {
+  const q = useQuery({ queryKey: ['latest-research'], queryFn: () => api.items({ content_type: 'research', page_size: 6 }) })
+  if (q.isError) return null
+  const id = `research-${layout}`
+  const items = q.data?.items.slice(0, layout === 'list' ? 5 : 6) ?? []
+  return (
+    <section aria-labelledby={id} className={layout === 'grid' ? 'mb-8' : 'rounded-2xl border bg-surface p-4 shadow-card'}>
+      <SectionTitle id={id} icon={FlaskConical} iconClass="text-ai" to="/search?q=research&content_type=research&sort=latest" linkLabel="More research">
+        Latest research
+      </SectionTitle>
+      {q.isPending ? (
+        <Skeleton className={layout === 'list' ? 'h-[23rem]' : 'h-48'} />
+      ) : (
+        <ul className={cn('-mx-2', layout === 'grid' ? 'grid gap-1 sm:grid-cols-2' : 'space-y-0.5')}>
+          {items.map((i) => (
+            <li key={i.id}>
+              <ArticleRow item={i} />
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }
@@ -243,26 +338,25 @@ function Interests() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
   return (
-    <section aria-labelledby="int-title" className="rounded-lg border bg-surface p-4">
-      <h2 id="int-title" className="mb-2 text-sm font-semibold">
-        Your interests
+    <section aria-labelledby="int-title" className="rounded-2xl border bg-surface p-4 shadow-card">
+      <h2 id="int-title" className="mb-1 flex items-center gap-2 font-semibold">
+        <Sparkles className="size-4 text-ai" aria-hidden /> Your interests
       </h2>
+      <p className="mb-3 text-xs text-muted-foreground">Learned in this browser from what you open, read and save.</p>
       {top.length === 0 && !profile.explicitTopics.length ? (
-        <p className="text-xs text-muted-foreground">Open, read and bookmark articles and this feed learns what you like.</p>
+        <p className="rounded-lg bg-elevated p-3 text-xs text-muted-foreground">Nothing yet. Open, read and bookmark articles and For You adapts.</p>
       ) : (
         <>
-          {profile.explicitTopics.length > 0 && (
-            <p className="mb-2 text-xs text-muted-foreground">Picked: {profile.explicitTopics.map(name).join(', ')}</p>
-          )}
-          <ul className="space-y-1.5">
+          {profile.explicitTopics.length > 0 && <p className="mb-2 text-xs text-muted-foreground">Following: {profile.explicitTopics.map(name).join(', ')}</p>}
+          <ul className="space-y-2">
             {top.map(([slug, w]) => (
               <li key={slug} className="text-xs">
-                <div className="flex justify-between">
-                  <span>{name(slug)}</span>
+                <div className="flex justify-between gap-2">
+                  <span className="truncate">{name(slug)}</span>
                   <span className="text-muted-foreground tabular-nums">{w.toFixed(1)}</span>
                 </div>
-                <div className="mt-0.5 h-1.5 rounded bg-muted" aria-hidden>
-                  <div className="h-full rounded bg-primary" style={{ width: `${(w / max) * 100}%` }} />
+                <div className="mt-1 h-1.5 rounded-full bg-elevated" aria-hidden>
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${(w / max) * 100}%` }} />
                 </div>
               </li>
             ))}
@@ -270,7 +364,7 @@ function Interests() {
           {tags.length > 0 && (
             <p className="mt-3 flex flex-wrap gap-1">
               {tags.map(([t]) => (
-                <span key={t} className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
+                <span key={t} className="rounded-md bg-elevated px-1.5 py-0.5 text-2xs">
                   {t}
                 </span>
               ))}
@@ -293,38 +387,62 @@ export default function HomePage() {
   const body = toRequest(profile, known)
 
   return (
-    <WithAside label="Personalization" aside={<Interests />}>
-      <h1 className="sr-only">For You</h1>
-      <Hero />
-      {!profile.onboarded && <TopicPicker />}
-      <details className="mb-4 xl:hidden">
-        <summary className="cursor-pointer text-sm font-medium">Your interests</summary>
-        <div className="mt-2">
+    <WithAside
+      label="Personalization and topics"
+      aside={
+        <>
           <Interests />
-        </div>
-      </details>
+          <ExploreTopics layout="list" />
+          <LatestResearch layout="list" />
+        </>
+      }
+    >
+      <h1 className="sr-only">For You</h1>
+      <Welcome />
+      <SearchBox id="home-search" large className="mb-5 md:hidden" />
+      {!profile.onboarded && <TopicPicker />}
+      <Trending />
       <Briefing />
-      <TrendingStrip />
-      <ExploreTopics />
-      <PageHeader title="For You" />
-      <Feed<ForYouItem>
-        // The read/bookmark lists change while reading; refetch only when preferences change.
-        queryKey={['foryou', body.categoryWeights, body.tagWeights, body.explicitTopics, body.dismissedIds.length]}
-        fetchPage={(page) => api.forYou(body, { page, page_size: 20 })}
-        render={(i) => (
-          <ItemCard
-            item={i}
-            reason={i.reason}
-            kicker={
-              i.kind === 'discover' && (
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ai px-2.5 py-0.5 text-2xs font-semibold text-ai-foreground">
-                  <Compass className="size-3" aria-hidden /> Discover
-                </span>
-              )
-            }
-          />
-        )}
-      />
+
+      <section aria-labelledby="foryou-title" className="relative mb-8">
+        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Sparkles className="size-4 text-ai" aria-hidden />
+          <h2 id="foryou-title" className="text-lg font-semibold tracking-tight">
+            For You
+          </h2>
+          <span className="text-xs text-muted-foreground">Ranked from your interests, plus a few discoveries</span>
+          <details className="group ml-auto xl:hidden">
+            <summary className="cursor-pointer list-none rounded-full border bg-surface px-3 py-1 text-xs font-medium hover:bg-elevated">Your interests</summary>
+            <div className="absolute right-0 left-0 z-20 mt-2 sm:left-auto sm:w-80">
+              <Interests />
+            </div>
+          </details>
+        </div>
+        <Feed<ForYouItem>
+          auto={false}
+          // The read/bookmark lists change while reading; refetch only when preferences change.
+          queryKey={['foryou', body.categoryWeights, body.tagWeights, body.explicitTopics, body.dismissedIds.length]}
+          fetchPage={(page) => api.forYou(body, { page, page_size: 12 })}
+          render={(i) => (
+            <ItemCard
+              item={i}
+              reason={i.reason}
+              kicker={
+                i.kind === 'discover' && (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ai px-2.5 py-0.5 text-2xs font-semibold text-ai-foreground">
+                    <Compass className="size-3" aria-hidden /> Discover
+                  </span>
+                )
+              }
+            />
+          )}
+        />
+      </section>
+
+      <div className="xl:hidden">
+        <ExploreTopics layout="chips" />
+        <LatestResearch layout="grid" />
+      </div>
     </WithAside>
   )
 }
