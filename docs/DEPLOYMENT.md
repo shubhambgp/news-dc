@@ -58,9 +58,24 @@ Run these with `exec` only while you won't run `up -d`: any `up -d` (even `up -d
 
 ## Update
 
+Automatic: every push to `main` whose CI jobs all pass runs the `deploy` job, which SSHes to the server and runs `scripts/deploy.sh` (`git pull --ff-only`, `up -d --build`, wait for the backend to be healthy, prune old images), then a short smoke test against the live site. Manual equivalent: `~/newsdc/scripts/deploy.sh`.
+
+One-time setup, from your machine (the repo is public, so the server pulls without credentials):
 ```bash
-cd ~/newsdc && git pull && docker compose -f docker-compose.prod.yml up -d --build
+ssh-keygen -t ed25519 -N "" -C newsdc-ci-deploy -f ~/.ssh/newsdc_deploy
+# On the server this key may only run deploy.sh: no shell, no forwarding.
+ssh ubuntu@15.235.142.100 "echo 'command=\"/home/ubuntu/newsdc/scripts/deploy.sh\",restrict $(cat ~/.ssh/newsdc_deploy.pub)' >> ~/.ssh/authorized_keys"
+gh secret set DEPLOY_SSH_KEY < ~/.ssh/newsdc_deploy
+ssh-keyscan -t ed25519 15.235.142.100 | gh secret set DEPLOY_KNOWN_HOSTS
+gh variable set DEPLOY_TARGET --body ubuntu@15.235.142.100
 ```
+| Name | Kind | Value |
+|---|---|---|
+| `DEPLOY_SSH_KEY` | secret | private key of the CI deploy key pair |
+| `DEPLOY_KNOWN_HOSTS` | secret | the server's host key line (`ssh-keyscan`), so CI can't be pointed at an impostor |
+| `DEPLOY_TARGET` | variable | `ubuntu@15.235.142.100` |
+
+App secrets (`ANTHROPIC_API_KEY`, `ADMIN_TOKEN`, ...) stay in the server's `.env`, never in GitHub. Anyone who can push to `main` can run code on the server; protect the branch if others get write access. Rotating the deploy key: generate a new pair, replace the `authorized_keys` line and the secret.
 Migrations run on backend start. The worker gets up to 60 s to put its running job back.
 
 ## Logs

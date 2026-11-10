@@ -289,3 +289,8 @@ Each entry: context, options, decision, why, trade-offs, and whether it changes 
 - **Smoke test:** `scripts/smoke_test.sh <base-url>` (curl, one paid Ask call) covers §11.11's list.
 - **Server:** Ubuntu 26.04 ships Docker from its own archive (`docker.io`, `docker-compose-v2`), used instead of the get.docker.com script.
 - **Changes plan:** minor (Nginx port, model volume, scanner scope), recorded here.
+
+## D-038 (2026-11-10): Push-to-deploy
+- **Decision:** a `deploy` job in `ci.yml` runs after `backend`, `frontend` and `images` pass on a push to `main`. It SSHes to the VPS with a dedicated key whose `authorized_keys` entry is `command="…/scripts/deploy.sh",restrict`, so the key can only trigger a deploy. The server pulls the public repo and rebuilds there; no registry, no images pushed.
+- **Why:** smallest working CD for one server. Plain `ssh` instead of a third-party SSH action (supply-chain exposure). Host key pinned through a secret, not `StrictHostKeyChecking=no`.
+- **Trade-offs:** builds happen on the 2 vCPU server (a few minutes, brief restart of backend/worker, a running pipeline stops and the worker resumes the rest). No automatic rollback: redeploy a previous commit with `git revert` + push. `concurrency: deploy` serializes deploys.
