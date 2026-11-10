@@ -183,7 +183,9 @@ Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
 | `docker-compose.prod.yml` (no DB port, `restart: unless-stopped`, log rotation, proxy headers), `Caddyfile` (HTTPS, compression, headers, frontend CSP) | Agent | Running on the VPS; 308 redirect and in-network checks. HTTPS pending DNS |
 | `Cache-Control` on public GETs; 60 s cache for `/topics` and `/stats` | Agent | 2 new pytest tests; header seen live |
 | `scripts/backup_db.sh` (encrypted), restore procedure, cron | Agent | Backup + restore into a scratch DB on the VPS (1,120 items) |
-| `scripts/smoke_test.sh`; CI `pip-audit`, `pnpm audit`, image builds | Agent | Audits run (clean). Smoke test pending DNS; CI pending push |
+| `scripts/smoke_test.sh`; CI `pip-audit`, `pnpm audit`, image builds | Agent | Audits run (clean); smoke test 8/8 on `https://news-dc.atinus.co`. CI pending push |
+| Domain switch to `news-dc`, certificate, first-load incident (pipeline killed by a container recreate) and recovery | Agent | VERIFICATION_LOG |
 | VPS setup: Docker, ufw, `.env` with fresh secrets, stack up, first data load | Agent (on the human's request, with the human's credentials) | VERIFICATION_LOG |
 | `docs/DEPLOYMENT.md`, D-037, logs, status | Agent | Pending human review |
-| Point the DNS A record, open the site over HTTPS, log in to Admin | Human | **Pending human verification** |
+| DNS A record for `news-dc.atinus.co` | Human | Done by the human; resolves to the VPS |
+| Open the site over HTTPS, log in to Admin | Human | **Pending human verification** |

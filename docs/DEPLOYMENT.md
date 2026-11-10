@@ -2,7 +2,7 @@
 
 Production runs `docker-compose.prod.yml` on one VPS: Caddy (ports 80/443, automatic HTTPS) → `/api/*` to `backend:8000` (FastAPI) and everything else to `frontend:8080` (Nginx serving the Vite build). The `worker` runs scheduled ingestion, the AI pipeline and the weekly brief. `db` is Postgres 16 + pgvector with no public port.
 
-Live instance: `https://new-dc.atinus.co` (VPS `15.235.142.100`, Ubuntu 26.04, 2 vCPU / 4 GB, repo in `/home/ubuntu/newsdc`).
+Live instance: `https://news-dc.atinus.co` (VPS `15.235.142.100`, Ubuntu 26.04, 2 vCPU / 4 GB, repo in `/home/ubuntu/newsdc`).
 
 ## 1. Server setup (once)
 
@@ -15,7 +15,7 @@ Recommended hardening: add your SSH key (`ssh-copy-id ubuntu@<ip>`), then set `P
 
 ## 2. DNS
 
-Create an **A record** for the hostname pointing to the server's IPv4 address (for `new-dc.atinus.co`: name `new-dc`, value `15.235.142.100`). If the zone is on Cloudflare, set the record to **DNS only** (grey cloud) so Caddy gets the Let's Encrypt certificate itself. If you later turn the proxy on, use SSL mode **Full (strict)**. Caddy retries the certificate on its own until the record resolves.
+Create an **A record** for the hostname pointing to the server's IPv4 address (for `news-dc.atinus.co`: name `news-dc`, value `15.235.142.100`). If the zone is on Cloudflare, set the record to **DNS only** (grey cloud) so Caddy gets the Let's Encrypt certificate itself. If you later turn the proxy on, use SSL mode **Full (strict)**. Caddy retries the certificate on its own until the record resolves.
 
 ## 3. Configure and start
 
@@ -27,8 +27,8 @@ Set these in `.env` (generate secrets with `openssl rand -hex 32`):
 
 | Variable | Value |
 |---|---|
-| `DOMAIN` | `new-dc.atinus.co` |
-| `CORS_ORIGINS` | `https://new-dc.atinus.co` (also the allowed Origin for admin writes) |
+| `DOMAIN` | `news-dc.atinus.co` |
+| `CORS_ORIGINS` | `https://news-dc.atinus.co` (also the allowed Origin for admin writes) |
 | `VITE_API_BASE_URL` | empty (same origin) |
 | `POSTGRES_PASSWORD`, `ADMIN_TOKEN`, `SESSION_SECRET`, `BACKUP_PASSPHRASE` | separate long random values |
 | `ANTHROPIC_API_KEY`, `CLASSIFIER_MODEL`, `ASSISTANT_MODEL` and the `*_USD_PER_MTOK` prices | see `docs/AI_CONFIG.md` |
@@ -50,9 +50,11 @@ docker compose -f docker-compose.prod.yml exec backend python -m app.pipeline --
 ## 5. Check it
 
 ```bash
-./scripts/smoke_test.sh https://new-dc.atinus.co    # health, frontend, feed, article, search, ask (one paid call), admin 401, export
+./scripts/smoke_test.sh https://news-dc.atinus.co    # health, frontend, feed, article, search, ask (one paid call), admin 401, export
 ```
 Then open the site: feeds have data, Ask AI answers with citations, `/admin` accepts `ADMIN_TOKEN`.
+
+Run these with `exec` only while you won't run `up -d`: any `up -d` (even `up -d caddy`) recreates a container whose `.env` values changed, and that kills a pipeline running inside it. Already stored items are safe; the rest stay `new` and the worker processes them later (or `python -m app.jobs enqueue pipeline`).
 
 ## Update
 

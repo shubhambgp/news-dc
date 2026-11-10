@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Production smoke test (§11.11): ./scripts/smoke_test.sh https://new-dc.atinus.co
+# Production smoke test (§11.11): ./scripts/smoke_test.sh https://news-dc.atinus.co
 # Checks health, frontend, feed, search, article detail, assistant (one paid call), admin
 # protection and export. Exits non-zero on the first failure.
 set -euo pipefail

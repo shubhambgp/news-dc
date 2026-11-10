@@ -2,6 +2,8 @@
 
 AI-powered discovery platform for Data Center news and research.
 
+**Live:** https://news-dc.atinus.co (deployment: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md))
+
 > Status: **Phase 3 (AI pipeline)**. See [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) and [plan.md](plan.md) for the build plan.
 
 ## Quick start (Docker)

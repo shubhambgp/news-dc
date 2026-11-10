@@ -946,13 +946,37 @@ Docker isn't available on the agent machine (R-001), so the acceptance run was d
 - Code copied with `rsync` (commit `c3a1bb3` working tree), `.env` created on the server (mode 600) with new random `POSTGRES_PASSWORD`, `ADMIN_TOKEN`, `SESSION_SECRET`, `BACKUP_PASSPHRASE` (`openssl rand -hex 32`); the Anthropic key and model settings copied from the local `.env` without printing them.
 - `docker compose -f docker-compose.prod.yml up -d --build`: `exit=0`. After 50 s `ps`: `backend Up (healthy)`, `db Up (healthy)`, `frontend Up (healthy)`, `worker Up`, `caddy Up`. Image sizes: backend 784 MB, frontend 83 MB.
 - From the Caddy container: `wget http://backend:8000/api/v1/ready` → `{"status":"ok","db":"ok","version":"0.1.0"}`; `wget http://frontend:8080/` → the built `index.html`; `/api/v1/topics` → `200`, `cache-control: public, max-age=30`.
-- `curl -sI http://127.0.0.1/ -H "Host: new-dc.atinus.co"` → `308 Permanent Redirect`, `Location: https://new-dc.atinus.co/`.
-- Caddy's certificate request failed as expected before DNS existed: `DNS problem: NXDOMAIN looking up A for new-dc.atinus.co` (it retries on its own).
+- `curl -sI http://127.0.0.1/ -H "Host: news-dc.atinus.co"` → `308 Permanent Redirect`, `Location: https://news-dc.atinus.co/`.
+- Caddy's certificate request failed as expected before DNS existed: `DNS problem: NXDOMAIN looking up A for news-dc.atinus.co` (it retries on its own).
 - The worker's first scheduled `ingest_all` started on boot (items `new|274` → `new|904` within minutes). A one-off `~/first_load.sh` then runs `app.ingest --all --since-days 365` and `app.pipeline --max-llm-items 5000` once the queue is idle.
 
 ### Backup and restore test (§11.10)
 `./scripts/backup_db.sh` → `wrote backups/newsdc-20261110T032314Z.dump.gpg (948K)`, file mode `-rw-------`. Decrypted and restored into a scratch database `newsdc_restore_test`: `items 1120 | item_sources 1120 | categories 14 | alembic 0005`, then dropped. Daily cron installed: `0 3 * * * cd /home/ubuntu/newsdc && ./scripts/backup_db.sh >> backups/backup.log 2>&1`.
 
-### Not checked yet
-- HTTPS, the full flow through Caddy and `scripts/smoke_test.sh`: waiting for the DNS A record for `new-dc.atinus.co`.
+### HTTPS and smoke test on the live domain
+The DNS record the human created is `news-dc` (not `new-dc` as first configured), so `DOMAIN` and `CORS_ORIGINS` were switched to `news-dc.atinus.co`. Caddy log: `certificate obtained successfully`, `identifier: news-dc.atinus.co`, issuer Let's Encrypt.
+
+`curl -sI https://news-dc.atinus.co/` → `HTTP/2 200`, `strict-transport-security: max-age=31536000; includeSubDomains`, the frontend CSP, `cache-control: no-cache`. A hashed asset → `cache-control: public, max-age=31536000, immutable`, `content-encoding: zstd`. Backend access log shows the real client IP (`122.183.45.144`, the agent's public IP), not Caddy's.
+
+`./scripts/smoke_test.sh https://news-dc.atinus.co`:
+```
+ok   ready
+ok   frontend
+ok   feed (item 1257)
+ok   article
+ok   search
+ok   ask
+ok   admin protected
+ok   export
+all checks passed
+```
+
+### First data load
+- 365-day backfill (`app.ingest --all --since-days 365`) after the worker's first scheduled ingest. Two sources failed and were isolated: `github` `HTTP 401` (the token from the local `.env` is rejected by `api.github.com/rate_limit` too; removed on the server, GitHub now runs unauthenticated), `dcd` `HTTP 403` (cause not confirmed; likely the site blocks the datacenter IP).
+- **Incident:** `docker compose up -d caddy` (after the domain change) also recreated `backend`, because its `CORS_ORIGINS` had changed, and that killed the CLI pipeline running in it via `exec` at 04:04:31 UTC. Items are stored one transaction each, so nothing was half-written; run 20 (`processed 1557, rejected_ai 874, $0.75`) was left `running` and was closed by hand as `partial`, `stop_reason=interrupted`. The remaining 291 items went through a worker `pipeline` job (job 3, `succeeded`). DEPLOYMENT.md now warns about this.
+- Final: `processed 2064`, `rejected_ai 946`, `rejected_prefilter 22`, `duplicate 82`, `new 0`. Classifier spend for all pipeline runs: `$0.91` (estimate).
+
+### Not checked
+- Local `docker compose -f docker-compose.prod.yml up` with `DOMAIN=localhost` (no Docker on the agent machine; the VPS run covers the same files).
 - CI on GitHub with the new audit and image-build jobs (not pushed).
+- Human click-through of the live site and Admin login.
