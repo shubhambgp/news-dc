@@ -5,12 +5,11 @@ import { useSearchParams } from 'react-router'
 import { CardGrid, CardSkeleton, EmptyState, ErrorState } from '@/components/common'
 import { ItemCard } from '@/components/ItemCard'
 import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/input'
 import { CONTENT_TYPES, type ItemSummary, type Page } from '@/lib/api'
 import { useCategories, useSources } from '@/lib/format'
 import { useProfileState } from '@/lib/profile'
 
-const selectCls =
-  'h-9 min-w-0 rounded-lg border bg-card px-2.5 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
 
 export function Filters({ hideCategory, children }: { hideCategory?: boolean; children?: ReactNode }) {
   const [sp, setSp] = useSearchParams()
@@ -30,39 +29,39 @@ export function Filters({ hideCategory, children }: { hideCategory?: boolean; ch
   return (
     <form role="search" aria-label="Filters" className="mb-3 grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap" onSubmit={(e) => e.preventDefault()}>
       {!hideCategory && (
-        <select aria-label="Category" className={selectCls} value={sp.get('category') ?? ''} onChange={(e) => set('category', e.target.value)}>
+        <Select aria-label="Category" className="sm:w-auto" value={sp.get('category') ?? ''} onChange={(e) => set('category', e.target.value)}>
           <option value="">All categories</option>
           {topics.map((t) => (
             <option key={t.slug} value={t.slug}>
               {t.name}
             </option>
           ))}
-        </select>
+        </Select>
       )}
-      <select aria-label="Content type" className={selectCls} value={sp.get('content_type') ?? ''} onChange={(e) => set('content_type', e.target.value)}>
+      <Select aria-label="Content type" className="sm:w-auto" value={sp.get('content_type') ?? ''} onChange={(e) => set('content_type', e.target.value)}>
         <option value="">All types</option>
         {CONTENT_TYPES.map((t) => (
           <option key={t} value={t}>
             {t[0].toUpperCase() + t.slice(1)}
           </option>
         ))}
-      </select>
-      <select aria-label="Source" className={selectCls} value={sp.get('source') ?? ''} onChange={(e) => set('source', e.target.value)}>
+      </Select>
+      <Select aria-label="Source" className="sm:w-auto" value={sp.get('source') ?? ''} onChange={(e) => set('source', e.target.value)}>
         <option value="">All sources</option>
         {sources.map((s) => (
           <option key={s.key} value={s.key}>
             {s.name}
           </option>
         ))}
-      </select>
-      <select aria-label="Minimum quality" className={selectCls} value={sp.get('min_quality') ?? ''} onChange={(e) => set('min_quality', e.target.value)}>
+      </Select>
+      <Select aria-label="Minimum quality" className="sm:w-auto" value={sp.get('min_quality') ?? ''} onChange={(e) => set('min_quality', e.target.value)}>
         <option value="">Any quality</option>
         {[40, 60, 70, 80].map((q) => (
           <option key={q} value={q}>
             Quality ≥ {q}
           </option>
         ))}
-      </select>
+      </Select>
       {children}
     </form>
   )

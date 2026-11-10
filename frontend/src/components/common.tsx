@@ -1,6 +1,7 @@
 import { AlertTriangle, Inbox, RotateCw } from 'lucide-react'
 import type { ReactNode } from 'react'
 
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ApiError, type ContentType } from '@/lib/api'
 import { categoryLook } from '@/lib/category'
@@ -35,7 +36,7 @@ export function CardSkeleton({ count = 6 }: { count?: number }) {
     <div role="status" aria-label="Loading">
       <CardGrid>
         {Array.from({ length: count }, (_, i) => (
-          <div key={i} className="overflow-hidden rounded-xl border bg-card">
+          <div key={i} className="overflow-hidden rounded-xl border bg-surface shadow-card">
             <Skeleton className="aspect-[16/6] rounded-none" />
             <div className="space-y-2 p-4">
               <Skeleton className="h-4 w-5/6" />
@@ -72,8 +73,10 @@ export function ErrorState({ error, retry }: { error: unknown; retry?: () => voi
         : error.message
       : 'Something went wrong.'
   return (
-    <div role="alert" className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center">
-      <AlertTriangle className="size-6 text-destructive" aria-hidden />
+    <div role="alert" className="flex flex-col items-center gap-3 rounded-xl border bg-surface p-8 text-center shadow-card">
+      <span className="grid size-11 place-items-center rounded-full bg-destructive/12 text-destructive" aria-hidden>
+        <AlertTriangle className="size-5" />
+      </span>
       <p className="text-sm">{msg}</p>
       {retry && (
         <Button variant="outline" size="sm" onClick={retry}>
@@ -86,23 +89,24 @@ export function ErrorState({ error, retry }: { error: unknown; retry?: () => voi
 
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-      <Inbox className="size-6" aria-hidden />
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-surface/60 p-10 text-center text-sm text-muted-foreground">
+      <span className="grid size-11 place-items-center rounded-full bg-elevated text-muted-foreground" aria-hidden>
+        <Inbox className="size-5" />
+      </span>
       {children}
     </div>
   )
 }
 
-const TYPE_STYLE: Record<ContentType, string> = {
-  news: 'bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-200',
-  research: 'bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-200',
-  investment: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200',
-  engineering: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
-}
+const TYPE_VARIANT = { news: 'primary', research: 'ai', investment: 'success', engineering: 'warning' } as const
 
 export function TypeBadge({ type }: { type: ContentType | null }) {
   if (!type) return null
-  return <span className={cn('rounded px-1.5 py-0.5 text-[11px] font-medium capitalize', TYPE_STYLE[type])}>{type}</span>
+  return (
+    <Badge variant={TYPE_VARIANT[type]} className="capitalize">
+      {type}
+    </Badge>
+  )
 }
 
 /** Quality as a 5-step bar, with the number for screen readers and on hover. */
@@ -122,7 +126,7 @@ export function Quality({ score }: { score: number | null }) {
 export function PageHeader({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-      <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
       {children}
     </div>
   )

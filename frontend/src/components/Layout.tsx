@@ -20,6 +20,8 @@ import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from
 import { ListSkeleton } from '@/components/common'
 import { categoryLook } from '@/lib/category'
 import { Button } from '@/components/ui/button'
+import { fieldClass } from '@/components/ui/input'
+import { Tip } from '@/components/ui/tooltip'
 import { useCategories } from '@/lib/format'
 import { useTheme, type Theme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
@@ -156,9 +158,9 @@ function SearchBox({ initial }: { initial: string }) {
         onChange={(e) => setQ(e.target.value)}
         maxLength={200}
         placeholder="Search data center news…"
-        className="h-10 w-full rounded-full border bg-card pr-8 pl-9 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className={cn(fieldClass, 'h-10 rounded-full pr-8 pl-9')}
       />
-      <kbd className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 rounded border px-1 text-[10px] text-muted-foreground sm:block">
+      <kbd className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 rounded border bg-elevated px-1.5 font-mono text-2xs text-muted-foreground sm:block">
         /
       </kbd>
     </form>
@@ -249,23 +251,21 @@ export function Layout() {
             <span className="sr-only sm:hidden">NewsDC home</span>
           </Link>
           <SearchBox key={urlQ} initial={urlQ} />
-          <Button asChild size="sm" className="bg-brand hidden text-white hover:opacity-90 sm:inline-flex">
+          <Button asChild variant="ai" size="sm" className="hidden sm:inline-flex">
             <Link to="/ask">
               <MessageCircleQuestion /> Ask AI
             </Link>
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(NEXT_THEME[theme])}
-            aria-label={`Theme: ${theme}. Switch to ${NEXT_THEME[theme]}`}
-            title={`Theme: ${theme}`}
-          >
-            <ThemeIcon />
-          </Button>
-          <Button variant="ghost" size="icon" className="hidden sm:inline-flex" onClick={openHelp} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">
-            <Keyboard />
-          </Button>
+          <Tip label={`Theme: ${theme} (t)`} side="bottom">
+            <Button variant="ghost" size="icon" onClick={() => setTheme(NEXT_THEME[theme])} aria-label={`Theme: ${theme}. Switch to ${NEXT_THEME[theme]}`}>
+              <ThemeIcon />
+            </Button>
+          </Tip>
+          <Tip label="Keyboard shortcuts (?)" side="bottom">
+            <Button variant="ghost" size="icon" className="hidden sm:inline-flex" onClick={openHelp} aria-label="Keyboard shortcuts">
+              <Keyboard />
+            </Button>
+          </Tip>
         </div>
       </header>
 
@@ -304,7 +304,7 @@ export function Layout() {
       <dialog
         ref={drawer}
         aria-label="Menu"
-        className="m-0 h-full max-h-none w-72 max-w-[85vw] bg-background p-4 text-foreground backdrop:bg-black/40"
+        className="m-0 h-full max-h-none w-72 max-w-[85vw] border-r bg-surface p-4 text-foreground shadow-overlay"
         onClick={(e) => e.target === drawer.current && drawer.current.close()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -319,7 +319,7 @@ export function Layout() {
       <dialog
         ref={help}
         aria-labelledby="shortcuts-title"
-        className="m-auto w-full max-w-md rounded-lg border bg-background p-5 text-foreground backdrop:bg-black/40"
+        className="m-auto w-full max-w-md rounded-2xl border bg-surface p-5 text-foreground shadow-overlay"
         onClick={(e) => e.target === help.current && help.current.close()}
       >
         <div className="mb-3 flex items-center justify-between">
@@ -334,7 +334,7 @@ export function Layout() {
           {SHORTCUTS.map(([k, v]) => (
             <div key={k} className="contents">
               <dt>
-                <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">{k}</kbd>
+                <kbd className="rounded border bg-elevated px-1.5 py-0.5 font-mono text-xs">{k}</kbd>
               </dt>
               <dd className="text-muted-foreground">{v}</dd>
             </div>

@@ -110,8 +110,8 @@ Brief palette, with the contrast fixes from the audit (measured WCAG ratios):
 | `--elevated` (`--muted`, `--accent`) | `#1B2A42` | `#F0F4FA` | |
 | `--primary` | `#60A5FA` | `#2563EB` | dark: button text is `#080D19` (7.6:1); white on `#60A5FA` is only 2.5:1 |
 | `--ai` | `#A78BFA` | `#7C3AED` | text OK on all surfaces (≥ 5.2:1) |
-| `--data` (secondary accent) | `#22D3EE` | `#0891B2` | light is 3.3–3.7:1, so icons, charts and large text only; text uses `#0E7490` |
-| `--success` | `#34D399` | `#059669` | light is 3.4–3.8:1, so icons only; text uses `#047857` |
+| `--data` (secondary accent) | `#22D3EE` | `#0891B2` | light is 3.3–3.7:1, so icons, charts and large text only; text uses `#155E75` (Phase 1: `#0E7490` was 4.4:1 on its tint) |
+| `--success` | `#34D399` | `#059669` | light is 3.4–3.8:1, so icons only; text uses `#065F46` (Phase 1: `#047857` was 4.48:1 on its tint) |
 | `--foreground` | `#F1F5F9` | `#172033` | |
 | `--muted-foreground` | `#94A3B8` | `#64748B` → **`#5B6B80`** | `#64748B` is 4.48 on background and 4.31 on elevated (fails AA); `#5B6B80` passes on all three |
 | `--border` | `#263449` | `#E2E8F0` | |
@@ -134,10 +134,10 @@ Components (restyle of `ui/`, plus new pieces where none exist):
 | Select (native `<select>` kept, for accessibility and no dependency) | restyle |
 | Card | restyle |
 | Badge (category, content type, status) | restyle |
-| Tooltip (`radix-ui`, already installed) | new |
-| DropdownMenu (`radix-ui`) for the filter "More" and sort menus | new |
+| Tooltip | new; **CSS-only** (Phase 1: Radix Tooltip added 17.6 kB gzip to the main bundle) |
+| DropdownMenu for the filter "More" and sort menus | **moved to Phase 4**, where it is first used |
 | Dialog (native `<dialog>`, D-036) | restyle |
-| Segmented control (time windows, sorts) | new |
+| Segmented control (time windows, sorts) | **moved to Phase 4**, where it is first used |
 | Skeleton, Empty and Error states | restyle |
 
 Output: `frontend/docs/UI_DESIGN_SYSTEM.md`.

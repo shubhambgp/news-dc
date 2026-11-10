@@ -4,29 +4,58 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* NewsDC design system (frontend/docs/UI_DESIGN_SYSTEM.md). Raw values live in :root / .dark;
+   this block maps them to Tailwind utilities (bg-surface, text-ai, shadow-card, text-2xs, ...). */
 @theme inline {
+    --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    /* Type scale additions to Tailwind's xs(12) sm(14) base(16) lg(18) xl(20) 2xl(24) 3xl(30) 4xl(36). */
+    --text-2xs: 0.6875rem;
+    --text-2xs--line-height: 1rem;
+    --text-md: 0.9375rem;
+    --text-md--line-height: 1.4rem;
+
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
     --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+    --radius-2xl: calc(var(--radius) * 2);
+    --radius-3xl: calc(var(--radius) * 2.4);
+    --radius-4xl: calc(var(--radius) * 2.8);
+
+    --shadow-card: var(--elev-1);
+    --shadow-raised: var(--elev-2);
+    --shadow-overlay: var(--elev-3);
+
     --color-background: var(--background);
     --color-foreground: var(--foreground);
-    --color-card: var(--card);
-    --color-card-foreground: var(--card-foreground);
-    --color-popover: var(--popover);
-    --color-popover-foreground: var(--popover-foreground);
+    --color-surface: var(--surface);
+    --color-elevated: var(--elevated);
+    --color-card: var(--surface);
+    --color-card-foreground: var(--foreground);
+    --color-popover: var(--surface);
+    --color-popover-foreground: var(--foreground);
     --color-primary: var(--primary);
     --color-primary-foreground: var(--primary-foreground);
-    --color-secondary: var(--secondary);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-muted: var(--muted);
+    --color-primary-ink: var(--primary-ink);
+    --color-ai: var(--ai);
+    --color-ai-foreground: var(--ai-foreground);
+    --color-ai-ink: var(--ai-ink);
+    --color-data: var(--data);
+    --color-data-ink: var(--data-ink);
+    --color-success: var(--success);
+    --color-success-ink: var(--success-ink);
+    --color-warning: var(--warning);
+    --color-warning-ink: var(--warning-ink);
+    --color-secondary: var(--elevated);
+    --color-secondary-foreground: var(--foreground);
+    --color-muted: var(--elevated);
     --color-muted-foreground: var(--muted-foreground);
-    --color-accent: var(--accent);
-    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--elevated);
+    --color-accent-foreground: var(--foreground);
     --color-destructive: var(--destructive);
+    --color-destructive-ink: var(--destructive-ink);
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);
@@ -35,95 +64,110 @@
     --color-chart-3: var(--chart-3);
     --color-chart-4: var(--chart-4);
     --color-chart-5: var(--chart-5);
-    --color-sidebar: var(--sidebar);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar: var(--background);
+    --color-sidebar-foreground: var(--foreground);
+    --color-sidebar-primary: var(--primary);
+    --color-sidebar-primary-foreground: var(--primary-foreground);
+    --color-sidebar-accent: var(--elevated);
+    --color-sidebar-accent-foreground: var(--foreground);
+    --color-sidebar-border: var(--border);
+    --color-sidebar-ring: var(--ring);
 }
 
+/* Light. `*-ink` = the same hue darkened for small text on tinted or light backgrounds (AA ≥ 4.5:1). */
 :root {
-    --radius: 0.75rem;
-    --background: oklch(0.985 0.004 265);
-    --foreground: oklch(0.18 0.03 265);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.18 0.03 265);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.18 0.03 265);
-    --primary: oklch(0.5 0.2 275);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.955 0.012 265);
-    --secondary-foreground: oklch(0.25 0.03 265);
-    --muted: oklch(0.955 0.012 265);
-    --muted-foreground: oklch(0.48 0.03 265);
-    --accent: oklch(0.945 0.02 270);
-    --accent-foreground: oklch(0.25 0.03 265);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.91 0.015 265);
-    --input: oklch(0.89 0.015 265);
-    --ring: oklch(0.55 0.2 275);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.975 0.006 265);
-    --sidebar-foreground: oklch(0.18 0.03 265);
-    --sidebar-primary: oklch(0.5 0.2 275);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.945 0.02 270);
-    --sidebar-accent-foreground: oklch(0.25 0.03 265);
-    --sidebar-border: oklch(0.91 0.015 265);
-    --sidebar-ring: oklch(0.55 0.2 275);
-    /* The CTA gradient: dark enough for white text in both themes. */
-    --brand-from: oklch(0.5 0.22 280);
-    --brand-to: oklch(0.52 0.22 330);
+    color-scheme: light;
+    --radius: 0.625rem;
+    --background: #F6F8FC;
+    --surface: #FFFFFF;
+    --elevated: #F0F4FA;
+    --foreground: #172033;
+    --muted-foreground: #5B6B80;
+    --border: #E2E8F0;
+    --input: #D5DDE8;
+    --ring: #2563EB;
+    --primary: #2563EB;
+    --primary-foreground: #FFFFFF;
+    --primary-ink: #1D4ED8;
+    --ai: #7C3AED;
+    --ai-foreground: #FFFFFF;
+    --ai-ink: #6D28D9;
+    --data: #0891B2;
+    --data-ink: #155E75;
+    --success: #059669;
+    --success-ink: #065F46;
+    --warning: #D97706;
+    --warning-ink: #92400E;
+    --destructive: #DC2626;
+    --destructive-ink: #B91C1C;
+    --chart-1: #2563EB;
+    --chart-2: #7C3AED;
+    --chart-3: #0891B2;
+    --chart-4: #059669;
+    --chart-5: #D97706;
+    --elev-1: 0 1px 2px rgb(23 32 51 / 0.05), 0 1px 3px rgb(23 32 51 / 0.04);
+    --elev-2: 0 4px 12px rgb(23 32 51 / 0.07), 0 1px 3px rgb(23 32 51 / 0.05);
+    --elev-3: 0 16px 40px rgb(23 32 51 / 0.14), 0 2px 6px rgb(23 32 51 / 0.06);
 }
 
 .dark {
-    --background: oklch(0.155 0.025 270);
-    --foreground: oklch(0.97 0.005 265);
-    --card: oklch(0.2 0.03 270);
-    --card-foreground: oklch(0.97 0.005 265);
-    --popover: oklch(0.2 0.03 270);
-    --popover-foreground: oklch(0.97 0.005 265);
-    --primary: oklch(0.76 0.13 280);
-    --primary-foreground: oklch(0.17 0.03 275);
-    --secondary: oklch(0.26 0.035 270);
-    --secondary-foreground: oklch(0.97 0.005 265);
-    --muted: oklch(0.26 0.035 270);
-    --muted-foreground: oklch(0.74 0.025 265);
-    --accent: oklch(0.27 0.045 275);
-    --accent-foreground: oklch(0.97 0.005 265);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 9%);
-    --input: oklch(1 0 0 / 14%);
-    --ring: oklch(0.7 0.15 280);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.175 0.028 270);
-    --sidebar-foreground: oklch(0.97 0.005 265);
-    --sidebar-primary: oklch(0.76 0.13 280);
-    --sidebar-primary-foreground: oklch(0.17 0.03 275);
-    --sidebar-accent: oklch(0.27 0.045 275);
-    --sidebar-accent-foreground: oklch(0.97 0.005 265);
-    --sidebar-border: oklch(1 0 0 / 9%);
-    --sidebar-ring: oklch(0.7 0.15 280);
+    color-scheme: dark;
+    --background: #080D19;
+    --surface: #101827;
+    --elevated: #1B2A42;
+    --foreground: #F1F5F9;
+    --muted-foreground: #94A3B8;
+    --border: #263449;
+    --input: #31425C;
+    --ring: #60A5FA;
+    --primary: #60A5FA;
+    --primary-foreground: #080D19;
+    --primary-ink: #93C5FD;
+    --ai: #A78BFA;
+    --ai-foreground: #080D19;
+    --ai-ink: #C4B5FD;
+    --data: #22D3EE;
+    --data-ink: #67E8F9;
+    --success: #34D399;
+    --success-ink: #6EE7B7;
+    --warning: #FBBF24;
+    --warning-ink: #FCD34D;
+    --destructive: #F87171;
+    --destructive-ink: #FCA5A5;
+    --chart-1: #60A5FA;
+    --chart-2: #A78BFA;
+    --chart-3: #22D3EE;
+    --chart-4: #34D399;
+    --chart-5: #FBBF24;
+    --elev-1: 0 1px 2px rgb(0 0 0 / 0.3);
+    --elev-2: 0 6px 16px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.3);
+    --elev-3: 0 20px 48px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.35);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
   body {
-    @apply bg-background text-foreground;
-    }
+    @apply bg-background font-sans text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  /* Fallback focus ring for anything that doesn't style its own. */
+  :where(a, button, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 28%, transparent);
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--input) transparent;
+  }
 }
 
 /* Untrusted Markdown (answers, trend brief): plain, readable typography. */
@@ -136,15 +180,48 @@
 .prose-news blockquote { @apply border-l-2 pl-3 text-muted-foreground; }
 
 /* Native <dialog>: no default border colour or padding surprises. */
-dialog::backdrop { background: rgb(0 0 0 / 0.4); }
+dialog::backdrop { background: rgb(8 13 25 / 0.55); backdrop-filter: blur(2px); }
 
-/* Brand gradient for CTAs (white text) and headline text. */
-.bg-brand { background-image: linear-gradient(120deg, var(--brand-from), var(--brand-to)); }
-.text-brand {
-  background-image: linear-gradient(100deg, var(--primary), oklch(0.68 0.2 330));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+/* CSS tooltip (components/ui/tooltip.tsx). Visual only; the element keeps its aria-label. */
+[data-tip] { position: relative; }
+@media (hover: hover) {
+  [data-tip]:hover::after,
+  [data-tip]:focus-visible::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 6px);
+    transform: translateX(-50%);
+    z-index: 50;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    background: var(--surface);
+    color: var(--foreground);
+    box-shadow: var(--elev-3);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1rem;
+    white-space: nowrap;
+    pointer-events: none;
+    animation: tip-in 120ms ease-out 300ms both;
+  }
+  [data-tip][data-tip-side="bottom"]:hover::after,
+  [data-tip][data-tip-side="bottom"]:focus-visible::after {
+    bottom: auto;
+    top: calc(100% + 6px);
+  }
+}
+@keyframes tip-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { [data-tip]::after { animation: none !important; } }
+
+/* Brand mark only (logo). White text: 5.2:1 or more on both stops. */
+.bg-brand { background-image: linear-gradient(135deg, #2563EB, #7C3AED); }
+
+/* AI-generated content marker: violet rule + faint tint. Pair with an "AI-generated" label. */
+.ai-block {
+  border-left: 2px solid var(--ai);
+  background: color-mix(in srgb, var(--ai) 6%, transparent);
 }
 
 /* Category artwork (no photos, D-039): a hue per category (`--h`), a glow and a faint grid. */
@@ -159,6 +236,6 @@ dialog::backdrop { background: rgb(0 0 0 / 0.4); }
 /* Hero glow behind the home headline. */
 .hero-glow {
   background:
-    radial-gradient(ellipse at 0% 0%, oklch(0.6 0.2 280 / 0.18), transparent 60%),
-    radial-gradient(ellipse at 100% 100%, oklch(0.6 0.2 330 / 0.12), transparent 55%);
+    radial-gradient(ellipse at 0% 0%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 60%),
+    radial-gradient(ellipse at 100% 100%, color-mix(in srgb, var(--ai) 10%, transparent), transparent 55%);
 }

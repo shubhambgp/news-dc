@@ -3,6 +3,8 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 
 import { Cover, Quality, TypeBadge } from '@/components/common'
+import { Badge } from '@/components/ui/badge'
+import { Tip } from '@/components/ui/tooltip'
 import type { ItemSummary } from '@/lib/api'
 import { safeUrl, timeAgo, useCategories } from '@/lib/format'
 import { profileStore, useProfileState } from '@/lib/profile'
@@ -20,7 +22,7 @@ type Props = {
 }
 
 const iconBtn =
-  'relative z-10 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+  'relative z-10 grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-elevated hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:size-8'
 
 /** One feed card. The title link covers the whole card; the controls sit above it (`z-10`).
  * `data-card` and the `data-*` actions are what the keyboard shortcuts drive. */
@@ -39,21 +41,18 @@ export function ItemCard({ item, reason, children, dismissible = true, kicker }:
       tabIndex={-1}
       aria-labelledby={`t-${item.id}`}
       className={cn(
-        'group relative flex h-full flex-col overflow-hidden rounded-xl border bg-card shadow-xs outline-none transition',
-        'hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 motion-reduce:transition-none motion-reduce:hover:translate-y-0',
+        'group relative flex h-full flex-col rounded-xl border bg-surface shadow-card outline-none transition',
+        'hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-raised motion-reduce:transition-none motion-reduce:hover:translate-y-0',
         'focus-visible:ring-2 focus-visible:ring-ring focus:ring-2 focus:ring-ring',
         read && 'opacity-60',
       )}
     >
-      <Cover slug={item.primary_category} className="aspect-[16/6]">
+      <Cover slug={item.primary_category} className="aspect-[16/6] rounded-t-[calc(var(--radius-xl)-1px)]">
         <div className="relative z-10 flex items-start justify-between gap-2 p-3">
           {item.primary_category ? (
-            <Link
-              to={`/topics/${item.primary_category}`}
-              className="truncate rounded-full bg-black/35 px-2.5 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm hover:bg-black/50 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-            >
-              {name(item.primary_category)}
-            </Link>
+            <Badge asChild variant="overlay" className="max-w-full truncate focus-visible:ring-white">
+              <Link to={`/topics/${item.primary_category}`}>{name(item.primary_category)}</Link>
+            </Badge>
           ) : (
             <span />
           )}
@@ -70,7 +69,7 @@ export function ItemCard({ item, reason, children, dismissible = true, kicker }:
         </h2>
         {children ?? (item.summary && <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{item.summary}</p>)}
         {reason && (
-          <p className="mt-2 inline-flex items-center gap-1 text-xs text-primary" title="Why am I seeing this?">
+          <p className="mt-2 inline-flex items-center gap-1 text-xs text-ai-ink">
             <Sparkles className="size-3 shrink-0" aria-hidden />
             <span className="sr-only">Why you're seeing this: </span>
             {reason}
@@ -78,7 +77,7 @@ export function ItemCard({ item, reason, children, dismissible = true, kicker }:
         )}
 
         <div className="mt-auto flex items-center gap-2 pt-3 text-xs text-muted-foreground">
-          <span aria-hidden className="grid size-5 shrink-0 place-items-center rounded bg-muted text-[10px] font-semibold text-foreground uppercase">
+          <span aria-hidden className="grid size-5 shrink-0 place-items-center rounded bg-elevated text-[10px] font-semibold text-foreground uppercase">
             {publisher.slice(0, 1)}
           </span>
           <span className="min-w-0 truncate font-medium text-foreground/80">{publisher}</span>
@@ -106,27 +105,30 @@ export function ItemCard({ item, reason, children, dismissible = true, kicker }:
           )}
           <span className="ml-auto flex items-center">
             {dismissible && (
-              <button
-                data-dismiss
-                type="button"
-                onClick={() => profileStore.track('dismiss', item)}
-                aria-label={`Not interested: ${item.title}`}
-                title="Not interested"
-                className={cn(iconBtn, 'sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 sm:focus-visible:opacity-100')}
-              >
-                <EyeOff className="size-4" />
-              </button>
+              <Tip label="Not interested">
+                <button
+                  data-dismiss
+                  type="button"
+                  onClick={() => profileStore.track('dismiss', item)}
+                  aria-label={`Not interested: ${item.title}`}
+                  className={cn(iconBtn, 'sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 sm:focus-visible:opacity-100')}
+                >
+                  <EyeOff className="size-4" />
+                </button>
+              </Tip>
             )}
-            <button
-              data-bookmark
-              type="button"
-              onClick={() => profileStore.toggleBookmark(item)}
-              aria-pressed={saved}
-              aria-label={saved ? `Remove bookmark: ${item.title}` : `Bookmark: ${item.title}`}
-              className={iconBtn}
-            >
-              {saved ? <BookmarkCheck className="size-4 text-primary" /> : <Bookmark className="size-4" />}
-            </button>
+            <Tip label={saved ? 'Remove bookmark' : 'Bookmark'}>
+              <button
+                data-bookmark
+                type="button"
+                onClick={() => profileStore.toggleBookmark(item)}
+                aria-pressed={saved}
+                aria-label={saved ? `Remove bookmark: ${item.title}` : `Bookmark: ${item.title}`}
+                className={iconBtn}
+              >
+                {saved ? <BookmarkCheck className="size-4 text-primary" /> : <Bookmark className="size-4" />}
+              </button>
+            </Tip>
           </span>
         </div>
       </div>

@@ -18,7 +18,7 @@ function TopicPicker() {
   const [picked, setPicked] = useState<string[]>([])
   const toggle = (s: string) => setPicked((p) => (p.includes(s) ? p.filter((x) => x !== s) : [...p, s]))
   return (
-    <section aria-labelledby="pick-title" className="mb-6 rounded-lg border bg-card p-4">
+    <section aria-labelledby="pick-title" className="mb-6 rounded-lg border bg-surface p-4">
       <h2 id="pick-title" className="font-semibold">
         What do you want to follow?
       </h2>
@@ -79,9 +79,9 @@ function Hero() {
       ]
     : []
   return (
-    <section aria-labelledby="hero-title" className="hero-glow mb-6 rounded-2xl border bg-card/60 p-5 sm:p-6">
+    <section aria-labelledby="hero-title" className="hero-glow mb-6 rounded-2xl border bg-surface/60 p-5 sm:p-6">
       <p id="hero-title" className="text-2xl leading-tight font-bold tracking-tight sm:text-3xl">
-        Your AI-powered <span className="text-brand">Data Center Intelligence.</span>
+        Your AI-powered <span className="text-primary">Data Center Intelligence.</span>
       </p>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
         News, research and engineering on infrastructure, AI compute, power, cooling and sustainability, filtered and summarized by AI.
@@ -117,9 +117,9 @@ function Briefing() {
   return (
     <Link
       to="/dashboard"
-      className="group mb-6 flex items-center gap-4 rounded-2xl border border-primary/30 bg-primary/8 p-4 hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className="group mb-6 flex items-center gap-4 rounded-2xl border border-ai/30 bg-ai/8 p-4 hover:border-ai/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
     >
-      <span className="bg-brand grid size-11 shrink-0 place-items-center rounded-xl text-white" aria-hidden>
+      <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-ai text-ai-foreground" aria-hidden>
         <Sparkles className="size-5" />
       </span>
       <span className="min-w-0 flex-1">
@@ -128,7 +128,7 @@ function Briefing() {
           Top moves and rising topics, written {timeAgo(brief.created_at)} from {brief.sources.length} sources.
         </span>
       </span>
-      <span className="bg-brand hidden shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium text-white sm:inline-flex">
+      <span className="hidden shrink-0 items-center gap-1 rounded-full bg-ai px-3 py-1.5 text-xs font-medium text-ai-foreground sm:inline-flex">
         View briefing <ArrowRight className="size-3.5 transition group-hover:translate-x-0.5" aria-hidden />
       </span>
     </Link>
@@ -147,9 +147,9 @@ function TrendingStrip() {
         <Skeleton className="mb-6 h-80 rounded-2xl md:h-48" />
       ) : (
         top && (
-          <article className="group relative mb-6 grid overflow-hidden rounded-2xl border bg-card transition hover:border-primary/40 md:grid-cols-[2fr_3fr]">
+          <article className="group relative mb-6 grid overflow-hidden rounded-2xl border bg-surface transition hover:border-primary/40 md:grid-cols-[2fr_3fr]">
             <Cover slug={top.primary_category} className="min-h-36" iconClass="size-36 -right-4 -bottom-6">
-              <span className="bg-brand absolute top-3 left-3 z-10 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white">
+              <span className="absolute top-3 left-3 z-10 inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-2xs font-semibold text-primary-foreground">
                 <Flame className="size-3" aria-hidden /> Top story
               </span>
             </Cover>
@@ -178,7 +178,7 @@ function TrendingStrip() {
         {q.isPending
           ? Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-44 w-60 shrink-0 rounded-xl" />)
           : rest.map((i, n) => (
-              <li key={i.id} className="relative w-60 shrink-0 snap-start overflow-hidden rounded-xl border bg-card transition hover:border-primary/40">
+              <li key={i.id} className="relative w-60 shrink-0 snap-start overflow-hidden rounded-xl border bg-surface transition hover:border-primary/40">
                 <Cover slug={i.primary_category} className="h-20" iconClass="size-14">
                   <span className="absolute top-2 left-2 z-10 grid size-6 place-items-center rounded-md bg-black/45 text-xs font-bold text-white">{n + 2}</span>
                 </Cover>
@@ -216,7 +216,7 @@ function ExploreTopics() {
               <Link
                 to={`/topics/${t.slug}`}
                 style={style}
-                className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm whitespace-nowrap hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                className="inline-flex items-center gap-1.5 rounded-full border bg-surface px-3 py-1.5 text-sm whitespace-nowrap hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               >
                 <Icon className="size-4 text-[oklch(0.62_0.15_var(--h))]" aria-hidden />
                 {t.name}
@@ -243,7 +243,7 @@ function Interests() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
   return (
-    <section aria-labelledby="int-title" className="rounded-lg border bg-card p-4">
+    <section aria-labelledby="int-title" className="rounded-lg border bg-surface p-4">
       <h2 id="int-title" className="mb-2 text-sm font-semibold">
         Your interests
       </h2>
@@ -318,7 +318,7 @@ export default function HomePage() {
               reason={i.reason}
               kicker={
                 i.kind === 'discover' && (
-                  <span className="bg-brand inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ai px-2.5 py-0.5 text-2xs font-semibold text-ai-foreground">
                     <Compass className="size-3" aria-hidden /> Discover
                   </span>
                 )
