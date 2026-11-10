@@ -220,3 +220,41 @@ Frontend only (`frontend/`). One entry per phase; plan in `UI_REDESIGN_PLAN.md`.
   - Playwright: pass. It covers the streamed answer, the `[1]` → `#src-0-1` anchor and the source link.
   - Screenshots: `/ask` (empty, and with an answer) and `/article/1281` at 320/375/430/768/1440/1920/2560 px in both themes. The answer screenshots use a canned SSE stream injected by the QA script, labelled "QA fixture answer" on screen, with real items as sources. No paid call was made. No overflow.
   - Lighthouse: mobile `/ask` 95/100 (CLS 0.022), `/article/1281` 91/100; desktop `/ask` 100/100, `/article/1281` 98/100.
+
+## Phase 7: dashboard and admin (2026-11-11)
+
+- **Status:** done, pending human review.
+- **Files:**
+  - `src/components/common.tsx`: new `StatusBadge` (run and job states; colour plus the word) and `StatTile` (KPI with icon, value and context).
+  - `src/pages/Dashboard.tsx` (same data, presentation only):
+    - KPI tiles with context (waiting, last 7 days, filtered out, today's cost)
+    - the per-day chart with a gradient area and an active dot
+    - the funnel and content type with value labels
+    - category, source and funnel labels on one line, truncated, with the full name in the tooltip (a custom tick, because Recharts wraps long ticks)
+    - descriptions that match `/stats` ("by primary category, so each item counts once", checked in `backend/app/api/trends.py`)
+    - status badges in the runs table
+    - the weekly brief as an AI-marked block
+    - a 3-column grid at 1920 px
+    - a shaped loading skeleton
+    - **Bug fixed:** chart tooltips used `var(--popover)` and `var(--muted)`, which Phase 1 removed, so the tooltip background had been transparent since Phase 1. They now use `--surface` and `--elevated`.
+    - **Overflow fixed:** the 30 px overflow at 320 px, open since Phase 1 (Rising topics columns couldn't shrink).
+  - `src/pages/Admin.tsx` (same calls, CSRF and paid-action confirmations, presentation only):
+    - sign-in card (the HttpOnly cookie wording was checked in `backend/app/api/admin.py`)
+    - summary tiles: active sources, jobs queued or running, dead letters, kept out of the feed
+    - an action toolbar with icons and "paid" badges on the LLM actions
+    - success and error messages as coloured alerts with icons
+    - source health as a dot plus words (Active / Active · last fetch failed / Paused / Disabled in config)
+    - status badges for jobs, runs and rejected items
+    - a job status filter (client-side over the loaded list)
+    - a "Reason" filter on "Kept out of the feed" through the API's existing `status` parameter (`docs/API.md`; no backend change)
+    - tables in a bordered scroller with a sticky header and row hover
+    - shared `Input`, `Textarea` and `Select`
+    - **Overflow fixed:** 162 px at 320 px and 107 px at 375 px. The `sr-only` checkbox label in the categories table is absolutely positioned, and with no positioned ancestor it escaped the table's scroller. The scroller is now `relative`.
+- **Checks:**
+  - lint, typecheck, Vitest 10, build: pass. Main JS 117.0 kB gzip; the Dashboard chunk is 114.6 kB gzip (Recharts, 113.3 kB before the redesign).
+  - Playwright: pass.
+  - Screenshots: `/dashboard` at 320/375/768/1440/1920/2560 px in both themes, and `/admin` signed in at 320/375/768/1440/1920 px in both themes, plus the sign-in card. Admin data in the screenshots is mocked by the QA script, never by the app: source names, categories and runs are real public data; the session, jobs and rejected rows are labelled "QA fixture". No overflow after the fixes.
+  - Lighthouse:
+    - `/dashboard`: mobile 82/100, desktop 98/100.
+    - `/admin`: mobile 94/100, desktop 98/100. These were measured on the error state, because the local proxy blocks `/admin/*`; the signed-in views were checked by screenshot only.
+- **Remaining:** the Dashboard mobile performance score (82) is held back by the Recharts chunk; nothing in this phase made it bigger.

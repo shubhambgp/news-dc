@@ -137,6 +137,40 @@ export function Quality({ score }: { score: number | null }) {
   )
 }
 
+const STATUS_VARIANT: Record<string, 'success' | 'primary' | 'warning' | 'destructive' | 'neutral'> = {
+  succeeded: 'success',
+  ok: 'success',
+  running: 'primary',
+  pending: 'primary',
+  partial: 'warning',
+  retry_wait: 'warning',
+  failed: 'destructive',
+  dead_letter: 'destructive',
+  cancelled: 'neutral',
+}
+
+/** Run, job and source states. Colour plus the word itself, never colour alone. */
+export function StatusBadge({ status }: { status: string }) {
+  return <Badge variant={STATUS_VARIANT[status] ?? 'neutral'}>{status.replace(/_/g, ' ')}</Badge>
+}
+
+/** A KPI: icon, value, label and an optional context line. */
+export function StatTile({ icon: Icon, label, value, sub, tone = 'primary' }: { icon: LucideIcon; label: string; value: ReactNode; sub?: ReactNode; tone?: 'primary' | 'ai' | 'data' | 'success' }) {
+  const tint = { primary: 'bg-primary/12 text-primary', ai: 'bg-ai/12 text-ai', data: 'bg-data/12 text-data', success: 'bg-success/12 text-success' }[tone]
+  return (
+    <div className="flex min-w-0 items-start gap-3 rounded-xl border bg-surface p-3 shadow-card sm:p-4">
+      <span className={cn('grid size-10 shrink-0 place-items-center rounded-xl max-sm:hidden', tint)} aria-hidden>
+        <Icon className="size-5" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-xl leading-tight font-semibold tracking-tight tabular-nums sm:text-2xl">{value}</p>
+        {sub && <p className="mt-0.5 truncate text-xs text-muted-foreground">{sub}</p>}
+      </div>
+    </div>
+  )
+}
+
 export function PageHeader({ title, description, icon: Icon, children }: { title: string; description?: ReactNode; icon?: LucideIcon; children?: ReactNode }) {
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
