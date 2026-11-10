@@ -112,7 +112,7 @@ export function Feed<T extends ItemSummary>({ queryKey, fetchPage, render, empty
 
   return (
     <div>
-      <CardGrid>{items.map((i) => <div key={i.id}>{render ? render(i) : <ItemCard item={i} />}</div>)}</CardGrid>
+      <CardGrid>{items.map((i) => <div key={i.id} className="min-w-0">{render ? render(i) : <ItemCard item={i} />}</div>)}</CardGrid>
       <div ref={sentinel} className="flex justify-center py-4">
         {q.isFetchNextPageError ? (
           <ErrorState error={error} retry={() => fetchNextPage()} />

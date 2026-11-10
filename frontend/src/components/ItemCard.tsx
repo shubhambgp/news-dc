@@ -86,7 +86,7 @@ export function ItemCard({ item, reason, children, dismissible = true, kicker }:
             {timeAgo(item.published_at)}
           </time>
         </div>
-        <div className="mt-2 flex items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
+        <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
           <TypeBadge type={item.content_type} />
           <Quality score={item.quality_score} />
           {item.points != null && item.points > 0 && (

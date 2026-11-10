@@ -153,7 +153,7 @@ Output: `frontend/docs/UI_DESIGN_SYSTEM.md`.
 | 1280–1535 | sidebar 248 px | fluid | 300 px on Home, Article and Search | 3 |
 | 1536–1919 | sidebar 256 px | fluid | 320 px | 3 |
 | 1920–2559 | sidebar 264 px | fluid | 340 px | 4 |
-| ≥ 2560 | shell capped at **2240 px** and centred; text capped at about 72ch | | 360 px | 4 (cards capped at about 420 px) |
+| ≥ 2560 | shell capped at **2240 px** and centred; text capped at about 72ch | | 360 px | 4–5 (Phase 2: a 5th column from 1792 px of container keeps cards at 300–420 px) |
 
 Rules:
 - The shell becomes a CSS grid (`sidebar | main | aside`) and the 1280 px `max-w-7xl` goes.

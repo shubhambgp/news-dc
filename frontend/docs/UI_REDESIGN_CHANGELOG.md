@@ -66,3 +66,44 @@ Frontend only (`frontend/`). One entry per phase; plan in `UI_REDESIGN_PLAN.md`.
   - Page-level files still use the older token names (`bg-card`, `bg-accent`, `bg-muted`). They map to the new tokens, so the colours are already right; each page is cleaned up in its own phase.
   - The article insight badges keep their old style until Phase 6.
   - The home "7-day activity" label truncates at 375 px (Phase 3).
+
+## Phase 2: application shell (2026-11-11)
+
+- **Status:** done, pending human review.
+- **Files:**
+  - `src/components/Layout.tsx`:
+    - grid shell; the header and body share `--sidebar-w`
+    - a new tablet icon `Rail`
+    - the sidebar grouped as Browse / Library / Intelligence / Categories, with Admin pinned to the bottom
+    - a wider search
+    - the mobile bar with 56 px targets and safe area
+    - the drawer with safe area
+  - `src/index.css`: `.shell` widths per breakpoint (0, 72, 232, 248, 256, 264 px), the 2240 px shell cap, left/right safe-area padding, `3xl` (1920) and `4xl` (2560) breakpoints, and a right-side tooltip.
+  - `src/components/common.tsx`:
+    - new `WithAside` (right panel from 1280 px: 300 → 320 → 340 → 360 px)
+    - `CardGrid` columns: 2 from a 576 px container, 3 from 896, 4 from 1280, 5 from 1792
+  - `src/components/ItemCard.tsx`: the meta row wraps. Without the wrap, cards forced 16 px of horizontal scroll at 320 px.
+  - `src/components/Feed.tsx`: grid cells get `min-w-0`.
+  - `src/components/ui/tooltip.tsx`: new `side="right"`.
+  - `src/pages/Home.tsx`: uses `WithAside`.
+  - `index.html`: `viewport-fit=cover`, so `env(safe-area-inset-*)` works on iOS.
+- **Layout per width:**
+
+  | Width | Layout |
+  |---|---|
+  | < 768 | header (menu, logo, search, theme) + bottom bar + drawer |
+  | 768–1023 | 72 px icon rail with hover labels, no bottom bar; feed in 2 columns |
+  | ≥ 1024 | full sidebar; the logo column lines up with the sidebar and the search with the content |
+  | 1920 | feed in 4 columns (3 next to the home panel) |
+  | ≥ 2240 | the shell stops growing and centres |
+
+- **Checks:**
+  - lint, typecheck, Vitest 10, build: pass. Main JS 113.8 kB gzip.
+  - Playwright: 3 out of 3 passed. It first failed on a strict-mode text clash: the sidebar group "Discover" matched the feed's "Discover" label. The group was renamed "Browse".
+  - Screenshots: 8 routes at all 9 brief sizes in dark (72 captures), then tablet and laptop in both themes, plus the drawer at 375 px. QA responses are now cached per URL, because the first run hit the live API's 60/min limit at 768 px, which showed as "Too many requests".
+  - Overflow: none, except `/dashboard` at 320 px (30 px). That one was already there in Phase 1 (26 px, Recharts panel) and is left for Phase 7.
+  - Lighthouse accessibility: 100 on `/` and `/trending` for phone (bottom bar), desktop (sidebar) and 800 px (rail, `/` and `/topics`). Home mobile performance: 91 (TBT 360 ms, CLS 0.045).
+- **Remaining:**
+  - Page bodies are unchanged (Phases 3–7).
+  - The home hero tiles stretch at 2560 px (Phase 3).
+  - Dashboard overflow at 320 px (Phase 7).

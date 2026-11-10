@@ -8,6 +8,10 @@
    this block maps them to Tailwind utilities (bg-surface, text-ai, shadow-card, text-2xs, ...). */
 @theme inline {
     --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    /* Extra breakpoints for wide screens: 3xl = 1920 px, 4xl = 2560 px. */
+    --breakpoint-3xl: 120rem;
+    --breakpoint-4xl: 160rem;
+
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
     /* Type scale additions to Tailwind's xs(12) sm(14) base(16) lg(18) xl(20) 2xl(24) 3xl(30) 4xl(36). */
@@ -182,6 +186,20 @@
 /* Native <dialog>: no default border colour or padding surprises. */
 dialog::backdrop { background: rgb(8 13 25 / 0.55); backdrop-filter: blur(2px); }
 
+/* App shell (components/Layout.tsx). The header and body grids share --sidebar-w, so the search box
+   lines up with the content column. Phone: no sidebar; tablet: icon rail; laptop and up: sidebar. */
+.shell {
+  --shell-max: 140rem; /* 2240 px: beyond this the shell centres instead of stretching. */
+  --sidebar-w: 0px;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+@media (min-width: 48rem) { .shell { --sidebar-w: 4.5rem; } }
+@media (min-width: 64rem) { .shell { --sidebar-w: 14.5rem; } }
+@media (min-width: 80rem) { .shell { --sidebar-w: 15.5rem; } }
+@media (min-width: 96rem) { .shell { --sidebar-w: 16rem; } }
+@media (min-width: 120rem) { .shell { --sidebar-w: 16.5rem; } }
+
 /* CSS tooltip (components/ui/tooltip.tsx). Visual only; the element keeps its aria-label. */
 [data-tip] { position: relative; }
 @media (hover: hover) {
@@ -210,6 +228,13 @@ dialog::backdrop { background: rgb(8 13 25 / 0.55); backdrop-filter: blur(2px); 
   [data-tip][data-tip-side="bottom"]:focus-visible::after {
     bottom: auto;
     top: calc(100% + 6px);
+  }
+  [data-tip][data-tip-side="right"]:hover::after,
+  [data-tip][data-tip-side="right"]:focus-visible::after {
+    bottom: auto;
+    top: 50%;
+    left: calc(100% + 8px);
+    transform: translateY(-50%);
   }
 }
 @keyframes tip-in { from { opacity: 0; } to { opacity: 1; } }

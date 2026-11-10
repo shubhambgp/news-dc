@@ -26,7 +26,21 @@ export function Cover({ slug, className, children, iconClass }: { slug: string |
 export function CardGrid({ children }: { children: ReactNode }) {
   return (
     <div className="@container">
-      <div className="grid gap-4 @2xl:grid-cols-2 @4xl:grid-cols-3">{children}</div>
+      {/* 2 cols from 576 px, 3 from 896 px, 4 from 1280 px, 5 from 1792 px of container: cards stay 300–420 px. */}
+      <div className="grid gap-4 @xl:grid-cols-2 @4xl:grid-cols-3 @7xl:grid-cols-4 @[112rem]:grid-cols-5 3xl:gap-5">{children}</div>
+    </div>
+  )
+}
+
+/** Page body with an optional right context panel. The panel shows from 1280 px and widens with
+ * the screen (300 → 360 px); below that, pages inline what matters or leave it out. */
+export function WithAside({ children, aside, label }: { children: ReactNode; aside: ReactNode; label: string }) {
+  return (
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_18.75rem] 2xl:grid-cols-[minmax(0,1fr)_20rem] 3xl:grid-cols-[minmax(0,1fr)_21.25rem] 3xl:gap-8 4xl:grid-cols-[minmax(0,1fr)_22.5rem]">
+      <div className="min-w-0">{children}</div>
+      <aside aria-label={label} className="hidden xl:block">
+        <div className="sticky top-22 space-y-4">{aside}</div>
+      </aside>
     </div>
   )
 }

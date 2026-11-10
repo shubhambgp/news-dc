@@ -5,7 +5,7 @@ import { Link } from 'react-router'
 
 import { Feed } from '@/components/Feed'
 import { ItemCard } from '@/components/ItemCard'
-import { Cover, PageHeader, Skeleton } from '@/components/common'
+import { Cover, PageHeader, Skeleton, WithAside } from '@/components/common'
 import { categoryLook } from '@/lib/category'
 import { Button } from '@/components/ui/button'
 import { api, type ForYouItem } from '@/lib/api'
@@ -293,43 +293,38 @@ export default function HomePage() {
   const body = toRequest(profile, known)
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1fr_16rem]">
-      <div className="min-w-0">
-        <h1 className="sr-only">For You</h1>
-        <Hero />
-        {!profile.onboarded && <TopicPicker />}
-        <details className="mb-4 xl:hidden">
-          <summary className="cursor-pointer text-sm font-medium">Your interests</summary>
-          <div className="mt-2">
-            <Interests />
-          </div>
-        </details>
-        <Briefing />
-        <TrendingStrip />
-        <ExploreTopics />
-        <PageHeader title="For You" />
-        <Feed<ForYouItem>
-          // The read/bookmark lists change while reading; refetch only when preferences change.
-          queryKey={['foryou', body.categoryWeights, body.tagWeights, body.explicitTopics, body.dismissedIds.length]}
-          fetchPage={(page) => api.forYou(body, { page, page_size: 20 })}
-          render={(i) => (
-            <ItemCard
-              item={i}
-              reason={i.reason}
-              kicker={
-                i.kind === 'discover' && (
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ai px-2.5 py-0.5 text-2xs font-semibold text-ai-foreground">
-                    <Compass className="size-3" aria-hidden /> Discover
-                  </span>
-                )
-              }
-            />
-          )}
-        />
-      </div>
-      <aside className="hidden xl:block" aria-label="Personalization">
-        <Interests />
-      </aside>
-    </div>
+    <WithAside label="Personalization" aside={<Interests />}>
+      <h1 className="sr-only">For You</h1>
+      <Hero />
+      {!profile.onboarded && <TopicPicker />}
+      <details className="mb-4 xl:hidden">
+        <summary className="cursor-pointer text-sm font-medium">Your interests</summary>
+        <div className="mt-2">
+          <Interests />
+        </div>
+      </details>
+      <Briefing />
+      <TrendingStrip />
+      <ExploreTopics />
+      <PageHeader title="For You" />
+      <Feed<ForYouItem>
+        // The read/bookmark lists change while reading; refetch only when preferences change.
+        queryKey={['foryou', body.categoryWeights, body.tagWeights, body.explicitTopics, body.dismissedIds.length]}
+        fetchPage={(page) => api.forYou(body, { page, page_size: 20 })}
+        render={(i) => (
+          <ItemCard
+            item={i}
+            reason={i.reason}
+            kicker={
+              i.kind === 'discover' && (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ai px-2.5 py-0.5 text-2xs font-semibold text-ai-foreground">
+                  <Compass className="size-3" aria-hidden /> Discover
+                </span>
+              )
+            }
+          />
+        )}
+      />
+    </WithAside>
   )
 }
