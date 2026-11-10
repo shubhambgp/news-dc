@@ -173,3 +173,17 @@ Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
 | Both themes look right; works at 375 px and desktop | Agent | Agent screenshots and an overflow check on 10 routes. **Pending human verification** |
 | Docs: CHANGELOG, API.md (search sort), DECISIONS D-036, logs, status | Agent | Pending human review |
 | Click through the UI in a browser (both themes, phone width), try the shortcuts, bookmark export and Admin | Human | **Pending human verification** |
+
+## Phase 10: Production Docker & deployment
+
+| Task | Done by | How verified |
+|---|---|---|
+| Re-read Phase 10, §9 deployment, §11.9–11.11, SECURITY.md and RISKS owed items (R-017, CSP, backups, CI scans) | Agent | n/a |
+| Multi-stage backend image with healthcheck; frontend `dev` + unprivileged Nginx prod stage; `nginx.conf` | Agent | Built and healthy on the VPS |
+| `docker-compose.prod.yml` (no DB port, `restart: unless-stopped`, log rotation, proxy headers), `Caddyfile` (HTTPS, compression, headers, frontend CSP) | Agent | Running on the VPS; 308 redirect and in-network checks. HTTPS pending DNS |
+| `Cache-Control` on public GETs; 60 s cache for `/topics` and `/stats` | Agent | 2 new pytest tests; header seen live |
+| `scripts/backup_db.sh` (encrypted), restore procedure, cron | Agent | Backup + restore into a scratch DB on the VPS (1,120 items) |
+| `scripts/smoke_test.sh`; CI `pip-audit`, `pnpm audit`, image builds | Agent | Audits run (clean). Smoke test pending DNS; CI pending push |
+| VPS setup: Docker, ufw, `.env` with fresh secrets, stack up, first data load | Agent (on the human's request, with the human's credentials) | VERIFICATION_LOG |
+| `docs/DEPLOYMENT.md`, D-037, logs, status | Agent | Pending human review |
+| Point the DNS A record, open the site over HTTPS, log in to Admin | Human | **Pending human verification** |

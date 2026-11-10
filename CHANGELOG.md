@@ -4,6 +4,20 @@ All notable changes, grouped by build phase. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Phase 10: Production Docker & deployment (2026-11-10)
+
+#### Added
+- `docker-compose.prod.yml`: Postgres+pgvector with no public port, backend (migrates on start, trusts proxy headers from Caddy), worker, Nginx frontend and Caddy on 80/443 with automatic HTTPS; `restart: unless-stopped` and log rotation on all services.
+- `Caddyfile`: `/api/*` to the backend, everything else to the frontend; zstd/gzip (not on the `/ask` stream); HSTS and security headers; a CSP for the frontend.
+- Production frontend stage (`nginx-unprivileged`, port 8080, immutable hashed assets, SPA fallback) and `frontend/nginx.conf`.
+- `scripts/backup_db.sh` (AES-256 encrypted `pg_dump`, keeps 14), `scripts/smoke_test.sh` (production smoke test), `docs/DEPLOYMENT.md`.
+- `Cache-Control: public, max-age=30` on public API `GET`s (`no-store` on admin and probes); `/topics` and `/stats` cached for 60 s.
+- CI: `pip-audit`, `pnpm audit --prod`, and a job that builds both production images.
+- `.env.example`: `DOMAIN`, `BACKUP_PASSPHRASE`.
+
+#### Changed
+- The backend Dockerfile is multi-stage (no uv in the runtime image) with a healthcheck. The frontend Dockerfile has a `dev` target, used by `docker-compose.yml`.
+
 ### Phase 9: Frontend UI, 9A–9E (2026-11-10)
 
 #### Added

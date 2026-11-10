@@ -926,3 +926,33 @@ A Playwright script opened 10 routes (`/`, `/trending`, `/topics`, `/topics/cool
 - Human review of the UI in both themes and at phone width (pending).
 - Safari/Firefox (only Chrome was used).
 - CI on GitHub (not pushed); the new CI steps (`pnpm test`, Playwright install, `pnpm e2e`) ran only locally.
+
+## Phase 10 (2026-11-10)
+
+### Local checks
+| Command | Result |
+|---|---|
+| `ruff format --check . && ruff check . && mypy app` (backend `.venv`; `uv` isn't installed, R-002) | `75 files already formatted`, `All checks passed!`, `Success: no issues found in 42 source files` |
+| `pytest -q` | `257 passed, 118 skipped` (2 new: `test_cache_control`, `test_cached_reuses_value_until_expiry`). DB tests **not run locally**: the local test Postgres on port 55433 was down (`Connection refused`); CI runs them |
+| `pnpm lint --deny-warnings && pnpm typecheck && pnpm test && pnpm build` | all pass |
+| `pnpm audit --prod --audit-level high` | `No known vulnerabilities found` |
+| `pip-audit@2.10.1 -r <uv export --no-dev>` (run on the VPS in the `uv:0.13.7-python3.12` image) | `No known vulnerabilities found` |
+
+Bundle (`vite build`, gzip): main `index` 110.95 kB, `Dashboard` (Recharts) 113.36 kB, `Markdown` 35.85 kB, `format` 27.65 kB, CSS 8.25 kB; every other route chunk < 5 kB.
+
+### Production deploy on the VPS (`15.235.142.100`, Ubuntu 26.04 LTS, 2 vCPU, 3.7 GiB RAM)
+Docker isn't available on the agent machine (R-001), so the acceptance run was done on the real server instead of locally with `DOMAIN=localhost`.
+- `apt-get install docker.io docker-compose-v2`: `Docker version 29.1.3`, `Docker Compose version 2.40.3`. `ufw`: OpenSSH, 80/tcp, 443 allowed, enabled.
+- Code copied with `rsync` (commit `c3a1bb3` working tree), `.env` created on the server (mode 600) with new random `POSTGRES_PASSWORD`, `ADMIN_TOKEN`, `SESSION_SECRET`, `BACKUP_PASSPHRASE` (`openssl rand -hex 32`); the Anthropic key and model settings copied from the local `.env` without printing them.
+- `docker compose -f docker-compose.prod.yml up -d --build`: `exit=0`. After 50 s `ps`: `backend Up (healthy)`, `db Up (healthy)`, `frontend Up (healthy)`, `worker Up`, `caddy Up`. Image sizes: backend 784 MB, frontend 83 MB.
+- From the Caddy container: `wget http://backend:8000/api/v1/ready` → `{"status":"ok","db":"ok","version":"0.1.0"}`; `wget http://frontend:8080/` → the built `index.html`; `/api/v1/topics` → `200`, `cache-control: public, max-age=30`.
+- `curl -sI http://127.0.0.1/ -H "Host: new-dc.atinus.co"` → `308 Permanent Redirect`, `Location: https://new-dc.atinus.co/`.
+- Caddy's certificate request failed as expected before DNS existed: `DNS problem: NXDOMAIN looking up A for new-dc.atinus.co` (it retries on its own).
+- The worker's first scheduled `ingest_all` started on boot (items `new|274` → `new|904` within minutes). A one-off `~/first_load.sh` then runs `app.ingest --all --since-days 365` and `app.pipeline --max-llm-items 5000` once the queue is idle.
+
+### Backup and restore test (§11.10)
+`./scripts/backup_db.sh` → `wrote backups/newsdc-20261110T032314Z.dump.gpg (948K)`, file mode `-rw-------`. Decrypted and restored into a scratch database `newsdc_restore_test`: `items 1120 | item_sources 1120 | categories 14 | alembic 0005`, then dropped. Daily cron installed: `0 3 * * * cd /home/ubuntu/newsdc && ./scripts/backup_db.sh >> backups/backup.log 2>&1`.
+
+### Not checked yet
+- HTTPS, the full flow through Caddy and `scripts/smoke_test.sh`: waiting for the DNS A record for `new-dc.atinus.co`.
+- CI on GitHub with the new audit and image-build jobs (not pushed).

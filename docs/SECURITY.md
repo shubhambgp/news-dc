@@ -61,10 +61,10 @@ The human should rotate the Anthropic key that was pasted into a chat during Pha
 
 - Every response: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `X-Request-ID`. API responses: `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`. The Swagger page is left without CSP rather than given a policy that breaks it.
 - CORS: only `CORS_ORIGINS`, with credentials (admin cookie), methods `GET`/`POST`/`PATCH`, headers `Content-Type`, `X-Request-ID`, `X-CSRF-Token`. In production the frontend and API share one origin behind Caddy, so `CORS_ORIGINS` is the site itself.
-- **Phase 10:** a CSP for the static Vite frontend at Caddy/Nginx (`default-src 'self'`, no inline scripts, `connect-src 'self'`, `frame-ancestors 'none'`), tested against the built app before it is enforced.
+- Frontend CSP set by Caddy (D-037): `default-src 'self'`, `script-src 'self'`, `style-src 'self' 'unsafe-inline'`, `connect-src 'self'`, `frame-ancestors 'none'`, plus HSTS. Checking it against the live app in a browser is pending DNS.
 
 ## Deployment
 
 - Containers run as non-root: backend uid 10001 (`backend/Dockerfile`), frontend dev image as `node` (`frontend/Dockerfile`). Not built on the agent machine because Docker isn't available (R-001).
-- The dev database port is bound to `127.0.0.1` only. **Phase 10:** the production database has no published port; only Caddy publishes 80/443.
-- **Phase 10:** encrypted database backups with `0600` permissions and a restore test; dependency and container vulnerability scans in CI where practical; uvicorn `--proxy-headers` limited to the Caddy network so rate limits see client IPs.
+- The dev database port is bound to `127.0.0.1` only. The production database has no published port; only Caddy publishes 80/443 (`ufw` allows SSH, 80, 443).
+- Encrypted database backups (`0600`, restore tested, docs/DEPLOYMENT.md); `pip-audit` and `pnpm audit` in CI (no container image scanner, D-037); uvicorn trusts proxy headers only from the compose network, so rate limits see client IPs. Secret rotation: docs/DEPLOYMENT.md.
