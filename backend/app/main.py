@@ -35,6 +35,7 @@ access_log = logging.getLogger("app.access")
 
 API_PREFIX = "/api/v1"
 DOCS_PATHS = (f"{API_PREFIX}/docs", f"{API_PREFIX}/openapi.json")
+UNCACHED = (f"{API_PREFIX}/health", f"{API_PREFIX}/ready")  # probes must see the live state
 _CLIENT_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 _HTTP_CODES = {
     400: "bad_request",
@@ -164,6 +165,14 @@ async def request_context(
     response.headers.update(SECURITY_HEADERS)
     if request.url.path not in DOCS_PATHS:
         response.headers["Content-Security-Policy"] = API_CSP
+    if request.method == "GET" and "cache-control" not in response.headers:
+        response.headers["Cache-Control"] = (
+            "public, max-age=30"
+            if response.status_code == 200
+            and request.url.path not in UNCACHED
+            and not request.url.path.startswith(f"{API_PREFIX}/admin")
+            else "no-store"
+        )
     access_log.info(
         "request",
         extra={

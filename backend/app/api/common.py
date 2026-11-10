@@ -1,7 +1,8 @@
 """Shared pieces of the public API: DB session, query parameters, the processed-items query,
 deterministic ordering, page/page_size pagination and row serialization (PLAN Phase 4, §11.7)."""
 
-from collections.abc import Iterator, Sequence
+import time
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
@@ -20,6 +21,7 @@ PAGE_SIZE_MAX = 50
 PAGE_MAX = 1000  # bounds the OFFSET a client can request
 SLUG = r"^[a-z0-9][a-z0-9_-]*$"
 Sort = Literal["latest", "relevance", "quality", "trending", "relevant"]
+CACHE_SECONDS = 60
 
 
 class ApiError(Exception):
@@ -40,6 +42,20 @@ _embedder = FastEmbedder()
 
 def get_embedder() -> Embedder:
     return _embedder
+
+
+# ponytail: per-process dict, fine for one API container; use a shared cache if it scales out.
+_ttl_cache: dict[str, tuple[float, Any]] = {}
+
+
+def cached[T](key: str, compute: Callable[[], T]) -> T:
+    """Reuse a response that doesn't depend on the request for CACHE_SECONDS (Phase 10)."""
+    now = time.monotonic()
+    hit = _ttl_cache.get(key)
+    if hit is None or now - hit[0] >= CACHE_SECONDS:
+        hit = _ttl_cache[key] = (now, compute())
+    value: T = hit[1]
+    return value
 
 
 @dataclass(frozen=True)

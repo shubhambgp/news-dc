@@ -8,7 +8,7 @@ from sqlalchemy import Date, case, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.ai import trends
-from app.api.common import get_db, public_items
+from app.api.common import cached, get_db, public_items
 from app.models import (
     ITEM_STATUSES,
     AIAnnotation,
@@ -86,7 +86,11 @@ def get_trends(db: Annotated[Session, Depends(get_db)]) -> TrendsResponse:
 @router.get("/stats", response_model=StatsResponse)
 def get_stats(db: Annotated[Session, Depends(get_db)]) -> StatsResponse:
     """Dashboard data: the ingestion funnel, processed items by category, content type, source and
-    day, recent pipeline runs and the estimated AI spend."""
+    day, recent pipeline runs and the estimated AI spend. Cached 60 s."""
+    return cached("stats", lambda: _stats(db))
+
+
+def _stats(db: Session) -> StatsResponse:
     by_status = dict.fromkeys(ITEM_STATUSES, 0) | dict(
         db.execute(select(Item.status, func.count()).group_by(Item.status)).all()
     )

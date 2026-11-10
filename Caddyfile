@@ -1,0 +1,27 @@
+# DOMAIN comes from .env. A real domain gets a Let's Encrypt certificate; localhost gets a local one.
+{$DOMAIN} {
+	# No compression on the SSE stream, or answers arrive in one burst.
+	@compress not path /api/v1/ask
+	encode @compress zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	handle /api/* {
+		# The API sets its own CSP (and none on /api/v1/docs, which needs a CDN script).
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		# The Vite build loads only its own files; React sets styles through the DOM, but some
+		# libraries inject <style> tags, hence 'unsafe-inline' for styles only.
+		header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		reverse_proxy frontend:8080
+	}
+}

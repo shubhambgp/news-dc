@@ -1,0 +1,81 @@
+# Production stack (Phase 10). docs/DEPLOYMENT.md has the step-by-step.
+#   docker compose -f docker-compose.prod.yml up -d --build
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+x-backend: &backend
+  build: ./backend
+  restart: unless-stopped
+  logging: *logging
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-newsdc}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-newsdc}
+    FASTEMBED_CACHE_PATH: /models  # downloaded on first use, kept in the volume
+  volumes:
+    - ./config:/config:ro
+    - models:/models
+  depends_on:
+    db:
+      condition: service_healthy
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-newsdc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-newsdc}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # no ports: reachable only on the compose network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    <<: *backend
+    # Only Caddy can reach this port, so trusting its X-Forwarded-* headers is safe; the rate
+    # limiter and the admin Origin check then see the real client IP and https scheme.
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips '*'"]
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "app.worker"]
+    init: true
+    stop_grace_period: 60s
+    healthcheck:
+      disable: true  # the image healthcheck probes the API, which the worker doesn't serve
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    logging: *logging
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  pgdata:
+  models:
+  caddy_data:
+  caddy_config:

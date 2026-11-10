@@ -13,6 +13,7 @@ from app.api.common import (
     Pagination,
     Sort,
     apply_filters,
+    cached,
     get_db,
     item_filters,
     paginate,
@@ -31,7 +32,11 @@ LATEST_PER_TOPIC = 3
 @router.get("", response_model=list[TopicSummary])
 def list_topics(db: Annotated[Session, Depends(get_db)]) -> list[TopicSummary]:
     """Enabled categories in display order, each with its processed-item count and newest 3
-    items. An item counts under every category it has, not only its primary one."""
+    items. An item counts under every category it has, not only its primary one. Cached 60 s."""
+    return cached("topics", lambda: _topics(db))
+
+
+def _topics(db: Session) -> list[TopicSummary]:
     cats = db.scalars(
         select(Category).where(Category.enabled).order_by(Category.sort_order, Category.slug)
     ).all()

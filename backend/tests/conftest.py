@@ -6,6 +6,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, text
 
 from alembic import command
+from app.api import common as api_common
 from app.config import get_settings
 from app.ingest import common
 from app.seed import seed
@@ -37,6 +38,12 @@ def engine():
     seed(eng, get_settings().config_dir)
     yield eng
     eng.dispose()
+
+
+@pytest.fixture(autouse=True)
+def fresh_response_cache():
+    """/topics and /stats are cached 60 s; each test sees its own data."""
+    api_common._ttl_cache.clear()
 
 
 @pytest.fixture(autouse=True)

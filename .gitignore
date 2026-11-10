@@ -25,3 +25,5 @@ data/*.db
 .DS_Store
 .agents
 .claude
+# Server backups
+backups/
