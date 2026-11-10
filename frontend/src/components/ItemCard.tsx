@@ -2,7 +2,7 @@ import { Bookmark, BookmarkCheck, EyeOff, MessageSquare, Sparkles, TrendingUp } 
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 
-import { Quality, TypeBadge } from '@/components/common'
+import { Cover, Quality, TypeBadge } from '@/components/common'
 import type { ItemSummary } from '@/lib/api'
 import { safeUrl, timeAgo, useCategories } from '@/lib/format'
 import { profileStore, useProfileState } from '@/lib/profile'
@@ -15,15 +15,22 @@ type Props = {
   /** Extra line under the title, e.g. a search snippet. */
   children?: ReactNode
   dismissible?: boolean
+  /** A label on the artwork, e.g. "Discover". */
+  kicker?: ReactNode
 }
 
-/** One feed row. `data-card` and the `data-*` actions are what the keyboard shortcuts drive. */
-export function ItemCard({ item, reason, children, dismissible = true }: Props) {
+const iconBtn =
+  'relative z-10 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+
+/** One feed card. The title link covers the whole card; the controls sit above it (`z-10`).
+ * `data-card` and the `data-*` actions are what the keyboard shortcuts drive. */
+export function ItemCard({ item, reason, children, dismissible = true, kicker }: Props) {
   const { profile } = useProfileState()
   const { name } = useCategories()
   const read = profile.readIds.includes(item.id)
   const saved = profile.bookmarkIds.includes(item.id)
   const discussion = safeUrl(item.discussion_url)
+  const publisher = item.publisher ?? item.source?.name ?? ''
 
   return (
     <article
@@ -32,79 +39,95 @@ export function ItemCard({ item, reason, children, dismissible = true }: Props) 
       tabIndex={-1}
       aria-labelledby={`t-${item.id}`}
       className={cn(
-        'group relative -mx-2 rounded-md px-2 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring focus:bg-accent/60',
+        'group relative flex h-full flex-col overflow-hidden rounded-xl border bg-card shadow-xs outline-none transition',
+        'hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 motion-reduce:transition-none motion-reduce:hover:translate-y-0',
+        'focus-visible:ring-2 focus-visible:ring-ring focus:ring-2 focus:ring-ring',
         read && 'opacity-60',
       )}
     >
-      <div className="flex gap-2">
-        <div className="min-w-0 flex-1">
-          <h2 id={`t-${item.id}`} className="text-[15px] leading-snug font-medium">
-            <Link data-open to={`/article/${item.id}`} className="hover:underline focus-visible:underline">
-              {item.title}
-            </Link>
-            {read && <span className="sr-only"> (read)</span>}
-          </h2>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-            <span className="max-w-48 truncate">{item.publisher ?? item.source?.name}</span>
-            <span aria-hidden>·</span>
-            <time dateTime={item.published_at ?? undefined}>{timeAgo(item.published_at)}</time>
-            {item.primary_category && (
-              <Link
-                to={`/topics/${item.primary_category}`}
-                className="rounded-full border px-2 py-0.5 text-[11px] text-foreground hover:bg-accent"
-              >
-                {name(item.primary_category)}
-              </Link>
-            )}
-            <TypeBadge type={item.content_type} />
-            <Quality score={item.quality_score} />
-            {item.points != null && item.points > 0 && (
-              <span className="inline-flex items-center gap-0.5" title="Points">
-                <TrendingUp className="size-3" aria-hidden />
-                {item.points}
-                <span className="sr-only"> points</span>
-              </span>
-            )}
-            {item.comments_count != null && item.comments_count > 0 && discussion && (
-              <a href={discussion} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 hover:underline">
-                <MessageSquare className="size-3" aria-hidden />
-                {item.comments_count}
-                <span className="sr-only"> comments</span>
-              </a>
-            )}
-          </div>
-          {children ?? (item.summary && <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{item.summary}</p>)}
-          {reason && (
-            <p className="mt-1 inline-flex items-center gap-1 text-xs text-primary" title="Why am I seeing this?">
-              <Sparkles className="size-3" aria-hidden />
-              <span className="sr-only">Why you're seeing this: </span>
-              {reason}
-            </p>
-          )}
-        </div>
-        <div className="flex shrink-0 flex-col items-center gap-1">
-          <button
-            data-bookmark
-            type="button"
-            onClick={() => profileStore.toggleBookmark(item)}
-            aria-pressed={saved}
-            aria-label={saved ? `Remove bookmark: ${item.title}` : `Bookmark: ${item.title}`}
-            className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            {saved ? <BookmarkCheck className="size-4 text-primary" /> : <Bookmark className="size-4" />}
-          </button>
-          {dismissible && (
-            <button
-              data-dismiss
-              type="button"
-              onClick={() => profileStore.track('dismiss', item)}
-              aria-label={`Not interested: ${item.title}`}
-              title="Not interested"
-              className="rounded p-1.5 text-muted-foreground opacity-100 hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 sm:focus-visible:opacity-100"
+      <Cover slug={item.primary_category} className="aspect-[16/6]">
+        <div className="relative z-10 flex items-start justify-between gap-2 p-3">
+          {item.primary_category ? (
+            <Link
+              to={`/topics/${item.primary_category}`}
+              className="truncate rounded-full bg-black/35 px-2.5 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm hover:bg-black/50 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
             >
-              <EyeOff className="size-4" />
-            </button>
+              {name(item.primary_category)}
+            </Link>
+          ) : (
+            <span />
           )}
+          {kicker}
+        </div>
+      </Cover>
+
+      <div className="flex flex-1 flex-col p-4">
+        <h2 id={`t-${item.id}`} className="line-clamp-3 text-[15px] leading-snug font-semibold">
+          <Link data-open to={`/article/${item.id}`} className="after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none">
+            {item.title}
+          </Link>
+          {read && <span className="sr-only"> (read)</span>}
+        </h2>
+        {children ?? (item.summary && <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">{item.summary}</p>)}
+        {reason && (
+          <p className="mt-2 inline-flex items-center gap-1 text-xs text-primary" title="Why am I seeing this?">
+            <Sparkles className="size-3 shrink-0" aria-hidden />
+            <span className="sr-only">Why you're seeing this: </span>
+            {reason}
+          </p>
+        )}
+
+        <div className="mt-auto flex items-center gap-2 pt-3 text-xs text-muted-foreground">
+          <span aria-hidden className="grid size-5 shrink-0 place-items-center rounded bg-muted text-[10px] font-semibold text-foreground uppercase">
+            {publisher.slice(0, 1)}
+          </span>
+          <span className="min-w-0 truncate font-medium text-foreground/80">{publisher}</span>
+          <span aria-hidden>·</span>
+          <time dateTime={item.published_at ?? undefined} className="shrink-0">
+            {timeAgo(item.published_at)}
+          </time>
+        </div>
+        <div className="mt-2 flex items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
+          <TypeBadge type={item.content_type} />
+          <Quality score={item.quality_score} />
+          {item.points != null && item.points > 0 && (
+            <span className="inline-flex items-center gap-0.5" title="Points">
+              <TrendingUp className="size-3" aria-hidden />
+              {item.points}
+              <span className="sr-only"> points</span>
+            </span>
+          )}
+          {item.comments_count != null && item.comments_count > 0 && discussion && (
+            <a href={discussion} target="_blank" rel="noopener noreferrer" className="relative z-10 inline-flex items-center gap-0.5 hover:text-foreground hover:underline">
+              <MessageSquare className="size-3" aria-hidden />
+              {item.comments_count}
+              <span className="sr-only"> comments</span>
+            </a>
+          )}
+          <span className="ml-auto flex items-center">
+            {dismissible && (
+              <button
+                data-dismiss
+                type="button"
+                onClick={() => profileStore.track('dismiss', item)}
+                aria-label={`Not interested: ${item.title}`}
+                title="Not interested"
+                className={cn(iconBtn, 'sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 sm:focus-visible:opacity-100')}
+              >
+                <EyeOff className="size-4" />
+              </button>
+            )}
+            <button
+              data-bookmark
+              type="button"
+              onClick={() => profileStore.toggleBookmark(item)}
+              aria-pressed={saved}
+              aria-label={saved ? `Remove bookmark: ${item.title}` : `Bookmark: ${item.title}`}
+              className={iconBtn}
+            >
+              {saved ? <BookmarkCheck className="size-4 text-primary" /> : <Bookmark className="size-4" />}
+            </button>
+          </span>
         </div>
       </div>
     </article>

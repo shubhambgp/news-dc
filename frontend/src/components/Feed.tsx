@@ -2,7 +2,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 
-import { EmptyState, ErrorState, ListSkeleton } from '@/components/common'
+import { CardGrid, CardSkeleton, EmptyState, ErrorState } from '@/components/common'
 import { ItemCard } from '@/components/ItemCard'
 import { Button } from '@/components/ui/button'
 import { CONTENT_TYPES, type ItemSummary, type Page } from '@/lib/api'
@@ -10,7 +10,7 @@ import { useCategories, useSources } from '@/lib/format'
 import { useProfileState } from '@/lib/profile'
 
 const selectCls =
-  'h-8 min-w-0 rounded-md border bg-background px-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+  'h-9 min-w-0 rounded-lg border bg-card px-2.5 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
 
 export function Filters({ hideCategory, children }: { hideCategory?: boolean; children?: ReactNode }) {
   const [sp, setSp] = useSearchParams()
@@ -102,7 +102,7 @@ export function Feed<T extends ItemSummary>({ queryKey, fetchPage, render, empty
     return () => io.disconnect()
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  if (q.isPending) return <ListSkeleton />
+  if (q.isPending) return <CardSkeleton />
   if (q.isError) return <ErrorState error={q.error} retry={() => q.refetch()} />
 
   const seen = new Set<number>()
@@ -113,7 +113,7 @@ export function Feed<T extends ItemSummary>({ queryKey, fetchPage, render, empty
 
   return (
     <div>
-      <div className="divide-y">{items.map((i) => <div key={i.id}>{render ? render(i) : <ItemCard item={i} />}</div>)}</div>
+      <CardGrid>{items.map((i) => <div key={i.id}>{render ? render(i) : <ItemCard item={i} />}</div>)}</CardGrid>
       <div ref={sentinel} className="flex justify-center py-4">
         {q.isFetchNextPageError ? (
           <ErrorState error={error} retry={() => fetchNextPage()} />

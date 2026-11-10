@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router'
 
 import { Feed, Filters } from '@/components/Feed'
 import { useFilterParams } from '@/lib/filters'
-import { EmptyState, ErrorState, ListSkeleton, PageHeader } from '@/components/common'
+import { Cover, EmptyState, ErrorState, ListSkeleton, PageHeader } from '@/components/common'
 import { api } from '@/lib/api'
 import { timeAgo, useCategories, useTitle } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -81,15 +81,16 @@ export function TopicsPage() {
       <PageHeader title="Topics" />
       <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {query.data.map((t) => (
-          <li key={t.slug} className="flex flex-col rounded-lg border bg-card p-4">
-            <div className="flex items-baseline justify-between gap-2">
-              <h2 className="font-semibold">
-                <Link to={`/topics/${t.slug}`} className="hover:underline">
+          <li key={t.slug} className="flex flex-col overflow-hidden rounded-xl border bg-card">
+            <Cover slug={t.slug} className="flex h-20 items-end p-4" iconClass="size-16">
+              <h2 className="relative z-10 font-semibold text-white">
+                <Link to={`/topics/${t.slug}`} className="hover:underline focus-visible:underline focus-visible:outline-none">
                   {t.name}
                 </Link>
               </h2>
-              <span className="text-xs text-muted-foreground tabular-nums">{t.item_count} items</span>
-            </div>
+              <span className="relative z-10 ml-auto shrink-0 rounded-full bg-black/35 px-2 py-0.5 text-[11px] whitespace-nowrap text-white tabular-nums">{t.item_count} items</span>
+            </Cover>
+            <div className="flex flex-1 flex-col p-4 pt-3">
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{t.description}</p>
             <ul className="mt-3 space-y-1.5 text-sm">
               {t.latest.map((i) => (
@@ -101,6 +102,7 @@ export function TopicsPage() {
                 </li>
               ))}
             </ul>
+            </div>
           </li>
         ))}
       </ul>

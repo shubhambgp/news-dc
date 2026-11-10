@@ -18,6 +18,7 @@ import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } fr
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router'
 
 import { ListSkeleton } from '@/components/common'
+import { categoryLook } from '@/lib/category'
 import { Button } from '@/components/ui/button'
 import { useCategories } from '@/lib/format'
 import { useTheme, type Theme } from '@/lib/theme'
@@ -144,7 +145,7 @@ function SearchBox({ initial }: { initial: string }) {
   }
   return (
     <form role="search" onSubmit={submit} className="relative min-w-0 flex-1 sm:max-w-md">
-      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+      <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
       <label htmlFor="site-search" className="sr-only">
         Search NewsDC
       </label>
@@ -155,9 +156,9 @@ function SearchBox({ initial }: { initial: string }) {
         onChange={(e) => setQ(e.target.value)}
         maxLength={200}
         placeholder="Search data center news…"
-        className="h-9 w-full rounded-md border bg-background pr-8 pl-8 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className="h-10 w-full rounded-full border bg-card pr-8 pl-9 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       />
-      <kbd className="pointer-events-none absolute top-1/2 right-2 hidden -translate-y-1/2 rounded border px-1 text-[10px] text-muted-foreground sm:block">
+      <kbd className="pointer-events-none absolute top-1/2 right-3 hidden -translate-y-1/2 rounded border px-1 text-[10px] text-muted-foreground sm:block">
         /
       </kbd>
     </form>
@@ -168,8 +169,8 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { topics } = useCategories()
   const link = ({ isActive }: { isActive: boolean }) =>
     cn(
-      'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-      isActive && 'bg-accent font-medium',
+      'relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-foreground/80 hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+      isActive && 'bg-primary/12 font-medium text-foreground before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-primary',
     )
   return (
     <nav aria-label="Main" className="space-y-6">
@@ -185,20 +186,24 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </ul>
       {topics.length > 0 && (
         <div>
-          <h2 className="mb-1 px-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Categories</h2>
+          <h2 className="mb-1 px-2.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Categories</h2>
           <ul className="space-y-0.5">
-            {topics.map((t) => (
+            {topics.map((t) => {
+              const { Icon, style } = categoryLook(t.slug)
+              return (
               <li key={t.slug}>
-                <NavLink to={`/topics/${t.slug}`} className={link} onClick={onNavigate}>
+                <NavLink to={`/topics/${t.slug}`} className={link} onClick={onNavigate} style={style}>
+                  <Icon className="size-4 shrink-0 text-[oklch(0.62_0.15_var(--h))]" aria-hidden />
                   <span className="flex-1 truncate">{t.name}</span>
                   <span className="text-xs text-muted-foreground tabular-nums">{t.item_count}</span>
                 </NavLink>
               </li>
-            ))}
+              )
+            })}
           </ul>
         </div>
       )}
-      <p className="px-2 text-xs text-muted-foreground">
+      <p className="px-2.5 text-xs text-muted-foreground">
         <Link to="/admin" className="hover:underline" onClick={onNavigate}>
           Admin
         </Link>
@@ -228,20 +233,23 @@ export function Layout() {
       <a href="#main" className="sr-only z-50 rounded bg-background p-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2">
         Skip to content
       </a>
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-3 sm:gap-3 sm:px-4">
+      <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur-md supports-backdrop-filter:bg-background/70">
+        <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-3 sm:gap-3 sm:px-4">
           <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open menu" onClick={() => drawer.current?.showModal()}>
             <Menu />
           </Button>
           <Link to="/" className="flex shrink-0 items-center gap-1.5 text-lg font-bold tracking-tight">
-            <span className="grid size-6 place-items-center rounded bg-primary text-xs text-primary-foreground" aria-hidden>
+            <span className="bg-brand grid size-8 place-items-center rounded-lg text-xs font-extrabold text-white shadow-md shadow-primary/20" aria-hidden>
               DC
             </span>
-            <span className="hidden sm:inline">NewsDC</span>
+            <span className="hidden leading-none sm:block">
+              NewsDC
+              <span className="block text-[10px] font-medium tracking-normal text-muted-foreground">Data Center Intelligence</span>
+            </span>
             <span className="sr-only sm:hidden">NewsDC home</span>
           </Link>
           <SearchBox key={urlQ} initial={urlQ} />
-          <Button asChild size="sm" className="hidden sm:inline-flex">
+          <Button asChild size="sm" className="bg-brand hidden text-white hover:opacity-90 sm:inline-flex">
             <Link to="/ask">
               <MessageCircleQuestion /> Ask AI
             </Link>
@@ -262,17 +270,17 @@ export function Layout() {
       </header>
 
       <div className="mx-auto flex max-w-7xl gap-6 px-3 sm:px-4">
-        <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-56 shrink-0 overflow-y-auto py-4 lg:block">
+        <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-60 shrink-0 overflow-y-auto py-4 lg:block">
           <Sidebar />
         </aside>
-        <main id="main" tabIndex={-1} className="min-w-0 flex-1 py-4 outline-none">
+        <main id="main" tabIndex={-1} className="min-w-0 flex-1 py-5 outline-none">
           <Suspense fallback={<ListSkeleton />}>
             <Outlet />
           </Suspense>
         </main>
       </div>
 
-      <nav aria-label="Mobile" className="fixed inset-x-0 bottom-0 z-30 border-t bg-background lg:hidden">
+      <nav aria-label="Mobile" className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
         <ul className="grid grid-cols-5">
           {MOBILE_NAV.map(({ to, label, icon: Icon, end }) => (
             <li key={to}>
@@ -280,10 +288,12 @@ export function Layout() {
                 to={to}
                 end={end}
                 className={({ isActive }) =>
-                  cn('flex flex-col items-center gap-0.5 py-2 text-[11px]', isActive ? 'font-medium text-foreground' : 'text-muted-foreground')
+                  cn('group flex flex-col items-center gap-0.5 py-1.5 text-[11px]', isActive ? 'font-semibold text-primary' : 'text-muted-foreground')
                 }
               >
-                <Icon className="size-5" aria-hidden />
+                <span className="rounded-full px-4 py-1 group-aria-[current=page]:bg-primary/15">
+                  <Icon className="size-5" aria-hidden />
+                </span>
                 {label === 'Most relevant' ? 'Relevant' : label}
               </NavLink>
             </li>

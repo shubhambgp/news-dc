@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import { ItemCard } from '@/components/ItemCard'
-import { EmptyState, ErrorState, ListSkeleton, Quality, TypeBadge } from '@/components/common'
+import { CardGrid, EmptyState, ErrorState, ListSkeleton, Quality, TypeBadge } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { ApiError, api, type ItemDetail } from '@/lib/api'
 import { fmtDate, safeUrl, timeAgo, useCategories, useTitle } from '@/lib/format'
@@ -243,11 +243,11 @@ export default function ArticlePage() {
         ) : related.data.length === 0 ? (
           <p className="text-sm text-muted-foreground">No related articles yet.</p>
         ) : (
-          <div className="divide-y">
+          <CardGrid>
             {related.data.map((r) => (
               <ItemCard key={r.id} item={r} dismissible={false} />
             ))}
-          </div>
+          </CardGrid>
         )}
       </Section>
     </article>

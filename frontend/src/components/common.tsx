@@ -3,10 +3,51 @@ import type { ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { ApiError, type ContentType } from '@/lib/api'
+import { categoryLook } from '@/lib/category'
 import { cn } from '@/lib/utils'
 
 export function Skeleton({ className }: { className?: string }) {
   return <div className={cn('animate-pulse rounded-md bg-muted', className)} />
+}
+
+/** Category artwork in place of a photo. Decorative: the category name is always shown as text. */
+export function Cover({ slug, className, children, iconClass }: { slug: string | null; className?: string; children?: ReactNode; iconClass?: string }) {
+  const { Icon, style } = categoryLook(slug)
+  return (
+    <div className={cn('cover relative overflow-hidden', className)} style={style}>
+      <Icon aria-hidden className={cn('absolute -right-2 -bottom-3 size-20 rotate-[-8deg] text-white/25', iconClass)} strokeWidth={1.25} />
+      {children}
+    </div>
+  )
+}
+
+/** Cards in columns that follow the container's width, not the viewport's. */
+export function CardGrid({ children }: { children: ReactNode }) {
+  return (
+    <div className="@container">
+      <div className="grid gap-4 @2xl:grid-cols-2 @4xl:grid-cols-3">{children}</div>
+    </div>
+  )
+}
+
+export function CardSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div role="status" aria-label="Loading">
+      <CardGrid>
+        {Array.from({ length: count }, (_, i) => (
+          <div key={i} className="overflow-hidden rounded-xl border bg-card">
+            <Skeleton className="aspect-[16/6] rounded-none" />
+            <div className="space-y-2 p-4">
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          </div>
+        ))}
+      </CardGrid>
+    </div>
+  )
 }
 
 export function ListSkeleton({ rows = 6 }: { rows?: number }) {

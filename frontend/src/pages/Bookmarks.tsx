@@ -1,7 +1,7 @@
 import { Download } from 'lucide-react'
 
 import { ItemCard } from '@/components/ItemCard'
-import { EmptyState, PageHeader } from '@/components/common'
+import { CardGrid, EmptyState, PageHeader } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import type { ItemSummary } from '@/lib/api'
 import { fmtDate, safeUrl, useTitle } from '@/lib/format'
@@ -50,11 +50,11 @@ export default function BookmarksPage() {
       {bookmarks.length === 0 ? (
         <EmptyState>No bookmarks yet. Press the bookmark icon (or b) on any article.</EmptyState>
       ) : (
-        <div className="divide-y">
+        <CardGrid>
           {bookmarks.map((b) => (
             <ItemCard key={b.id} item={b} dismissible={false} />
           ))}
-        </div>
+        </CardGrid>
       )}
     </>
   )
