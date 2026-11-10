@@ -978,5 +978,10 @@ all checks passed
 
 ### Not checked
 - Local `docker compose -f docker-compose.prod.yml up` with `DOMAIN=localhost` (no Docker on the agent machine; the VPS run covers the same files).
-- CI on GitHub with the new audit and image-build jobs (not pushed).
 - Human click-through of the live site and Admin login.
+
+### CI/CD on GitHub
+- First push of Phases 0–10. The previous run (42677836217, Phase 9) had failed: `tests/test_api_db.py::test_utc_sessions` opens the app's own engine, and CI didn't set `DATABASE_URL` (default port 5433, `Connection refused`). Fixed by setting it to the CI Postgres.
+- Push needed the `workflow` scope on the human's `gh` token (`refusing to allow an OAuth App to create or update workflow`); the human ran `gh auth refresh -s workflow`.
+- Run 42755588479 (`fb897a2`): `backend: success` (`375 passed`, `pip-audit`: `No known vulnerabilities found`), `frontend: success`, `images: success`, `deploy: success` (`deployed fb897a2`, backend healthy). Live `/api/v1/ready` → `{"status":"ok","db":"ok"}` afterwards.
+- Deploy key: forced command checked by connecting with the key and sending `echo should-not-run; id`; the server ran `deploy.sh` instead.
