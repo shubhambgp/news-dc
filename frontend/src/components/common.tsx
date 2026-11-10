@@ -1,4 +1,4 @@
-import { AlertTriangle, Inbox, RotateCw } from 'lucide-react'
+import { AlertTriangle, Inbox, RotateCw, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -137,10 +137,16 @@ export function Quality({ score }: { score: number | null }) {
   )
 }
 
-export function PageHeader({ title, children }: { title: string; children?: ReactNode }) {
+export function PageHeader({ title, description, icon: Icon, children }: { title: string; description?: ReactNode; icon?: LucideIcon; children?: ReactNode }) {
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+      <div className="min-w-0">
+        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+          {Icon && <Icon className="size-5 text-primary" aria-hidden />}
+          {title}
+        </h1>
+        {description && <p className="mt-1 max-w-[72ch] text-sm text-muted-foreground">{description}</p>}
+      </div>
       {children}
     </div>
   )

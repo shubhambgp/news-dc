@@ -5,7 +5,7 @@ import { Cover, TypeBadge } from '@/components/common'
 import { Badge } from '@/components/ui/badge'
 import type { ItemSummary } from '@/lib/api'
 import { categoryLook } from '@/lib/category'
-import { timeAgo, useCategories } from '@/lib/format'
+import { safeUrl, timeAgo, useCategories } from '@/lib/format'
 
 // Article presentations besides the standard feed card (`ItemCard`). Each one links the whole
 // block through its title (`after:inset-0`), so there is one tab stop per article.
@@ -16,7 +16,13 @@ const source = (i: ItemSummary) => i.publisher ?? i.source?.name ?? ''
 export function FeaturedCard({ item, label = 'Top story' }: { item: ItemSummary; label?: string }) {
   const { name } = useCategories()
   return (
-    <article className="group relative grid overflow-hidden rounded-2xl border bg-surface shadow-card transition hover:border-primary/40 hover:shadow-raised md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+    // data-card: j/k/o and Shift+O reach the featured story like any feed card.
+    <article
+      data-card
+      data-original={safeUrl(item.url)}
+      tabIndex={-1}
+      className="group relative grid overflow-hidden rounded-2xl border bg-surface shadow-card outline-none transition hover:border-primary/40 hover:shadow-raised focus:ring-2 focus:ring-ring md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]"
+    >
       <Cover slug={item.primary_category} className="min-h-40 md:min-h-56" iconClass="size-36 -right-4 -bottom-6">
         <Badge className="absolute top-3 left-3 z-10 rounded-full bg-primary px-2.5 text-primary-foreground">
           <Flame aria-hidden /> {label}
@@ -25,7 +31,7 @@ export function FeaturedCard({ item, label = 'Top story' }: { item: ItemSummary;
       <div className="flex flex-col justify-center gap-2 p-5 md:p-6">
         {item.primary_category && <p className="text-xs font-semibold text-primary-ink">{name(item.primary_category)}</p>}
         <h2 className="line-clamp-3 text-xl leading-snug font-bold tracking-tight text-balance md:text-2xl">
-          <Link to={`/article/${item.id}`} className="after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none">
+          <Link data-open to={`/article/${item.id}`} className="after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none">
             {item.title}
           </Link>
         </h2>

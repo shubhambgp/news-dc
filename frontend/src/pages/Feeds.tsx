@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
+import { Flame, Star } from 'lucide-react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
-import { Feed, Filters } from '@/components/Feed'
-import { useFilterParams } from '@/lib/filters'
+import { Feed, Filters, ViewToggle } from '@/components/Feed'
+import { Segmented } from '@/components/ui/segmented'
+import { useFilterParams, useView } from '@/lib/filters'
 import { Cover, EmptyState, ErrorState, ListSkeleton, PageHeader } from '@/components/common'
 import { api } from '@/lib/api'
 import { timeAgo, useCategories, useTitle } from '@/lib/format'
-import { cn } from '@/lib/utils'
 
 const WINDOWS = { '24h': 1, '7d': 7, '30d': 30 } as const
 type Window = keyof typeof WINDOWS
@@ -22,39 +23,31 @@ export function TrendingPage() {
   useTitle('Trending', 'What the data center industry is talking about right now.')
   const filters = useFilterParams()
   const [sp, setSp] = useSearchParams()
+  const [view] = useView()
   const w = (sp.get('window') as Window) in WINDOWS ? (sp.get('window') as Window) : '7d'
   const from = since(w)
+  const setWindow = (k: Window) =>
+    setSp(
+      (p) => {
+        const n = new URLSearchParams(p)
+        n.set('window', k)
+        return n
+      },
+      { replace: true },
+    )
   return (
     <>
-      <PageHeader title="Trending">
-        <div role="tablist" aria-label="Time window" className="inline-flex rounded-md border p-0.5">
-          {(Object.keys(WINDOWS) as Window[]).map((k) => (
-            <button
-              key={k}
-              role="tab"
-              aria-selected={k === w}
-              onClick={() =>
-                setSp(
-                  (p) => {
-                    const n = new URLSearchParams(p)
-                    n.set('window', k)
-                    return n
-                  },
-                  { replace: true },
-                )
-              }
-              className={cn(
-                'rounded px-3 py-1 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                k === w ? 'bg-primary text-primary-foreground' : 'hover:bg-accent',
-              )}
-            >
-              {k}
-            </button>
-          ))}
-        </div>
+      <PageHeader title="Trending" icon={Flame} description="Engagement (points, comments), quality and how many outlets covered a story, fading with age.">
+        <Segmented label="Time window" value={w} onChange={setWindow} options={(Object.keys(WINDOWS) as Window[]).map((k) => [k, k] as const)} />
       </PageHeader>
-      <Filters />
-      <Feed queryKey={['trending', filters, from]} fetchPage={(page) => api.trending({ ...filters, from, page })} />
+      <Filters toolbar={<ViewToggle />} />
+      <Feed
+        queryKey={['trending', filters, from]}
+        fetchPage={(page) => api.trending({ ...filters, from, page })}
+        layout={view}
+        featureFirst={view === 'card'}
+        countNoun={`articles in the last ${w}`}
+      />
     </>
   )
 }
@@ -62,11 +55,12 @@ export function TrendingPage() {
 export function RelevantPage() {
   useTitle('Most relevant', 'The most relevant, highest-quality data center stories.')
   const filters = useFilterParams()
+  const [view] = useView()
   return (
     <>
-      <PageHeader title="Most relevant" />
-      <Filters />
-      <Feed queryKey={['relevant', filters]} fetchPage={(page) => api.relevant({ ...filters, page })} />
+      <PageHeader title="Most relevant" icon={Star} description="Ranked by the AI relevance and quality scores, with a gentle preference for newer stories." />
+      <Filters toolbar={<ViewToggle />} />
+      <Feed queryKey={['relevant', filters]} fetchPage={(page) => api.relevant({ ...filters, page })} layout={view} countNoun="articles" />
     </>
   )
 }

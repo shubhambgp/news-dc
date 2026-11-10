@@ -141,3 +141,33 @@ Frontend only (`frontend/`). One entry per phase; plan in `UI_REDESIGN_PLAN.md`.
 - **Remaining:**
   - The featured story is usually also the first For You card (both rank by trending). Removing it would mean filtering the server's ranking on the client; left as is.
   - Under the onboarding row, the native scrollbar shows on desktop.
+
+## Phase 4: news discovery (2026-11-11)
+
+- **Status:** done, pending human review.
+- **Files:**
+  - `src/components/Feed.tsx`:
+    - new filter toolbar: content type chips; category, source and quality selects; "Clear filters (n)"; a "Filters" button on phones; a `toolbar` slot
+    - `ViewToggle`
+    - `Feed` gets `layout` (card/row), `featureFirst`, `countNoun` and a row skeleton; `render(item, layout)`
+  - `src/components/ItemCard.tsx`:
+    - new `row` layout with artwork on the left; the same `data-*` keyboard hooks
+    - "Not interested" is hidden until hover only on devices that have hover. Before, it was invisible on touch tablets wider than 640 px.
+  - `src/components/ui/segmented.tsx`: new segmented control (buttons with `aria-pressed` in a labelled group). It replaces the old `role="tab"` buttons, which had no tab panel.
+  - `src/components/ArticleCards.tsx`: `FeaturedCard` is now a `data-card`, so `j`/`k`/`o`/`Shift+O` reach it.
+  - `src/components/common.tsx`: `PageHeader` takes `description` and `icon`.
+  - `src/lib/filters.ts`: `useSetParam`, `useView`. The view is kept in the URL (`view=list`).
+  - `src/pages/Feeds.tsx` (Trending, Most relevant): descriptions that match the formulas in `docs/ARCHITECTURE.md`; 24h/7d/30d as a segmented control; on Trending, #1 as the featured card in grid view.
+  - `src/pages/Search.tsx`: sort as a segmented control, view toggle, date fields in the field style, the result count, token-based `<mark>`, example queries when the box is empty, and a red alert for a bad date range.
+- **Grid:** 1 column on phones, 2 on tablets, 3 on a standard desktop, 4 at 1920 px, up to 5 at 2560 px (container-based, Phase 2).
+- **Checks:**
+  - lint, typecheck, Vitest 10, build: pass. Main JS 117.0 kB gzip.
+  - Playwright: pass.
+  - Screenshots: Trending, Most relevant, Search (with and without a query) and the research list view at 375/768/1440/1920/2560 px in dark, then 320/375/430 px in both themes.
+  - Overflow fixes found by the screenshots: the search toolbar (3 px) and the list-row source line (1 px) at 375 px. No overflow after the fixes.
+  - Lighthouse (mobile): `/trending` accessibility 100 / performance 91, `/relevant` 100/97, `/search?q=…` 100/96, `/trending?view=list` 100/97. Desktop `/search`: 100/100. CLS 0 everywhere.
+  - Keyboard (Playwright on live data): in grid and list view, `j` reaches the featured card and then the next card, `k` goes back, and `b` bookmarks a list row (`aria-pressed=true`).
+  - The count is checked against the API: "100 articles in the last 7d" matches `/items?from=…` (100); without a window, `/feeds/trending` reports 2,073.
+- **Remaining:**
+  - On phones the search toolbar takes three short rows (types, Filters + sort, view).
+  - The topic page sort select is restyled in Phase 5.
