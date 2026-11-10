@@ -171,3 +171,23 @@ Frontend only (`frontend/`). One entry per phase; plan in `UI_REDESIGN_PLAN.md`.
 - **Remaining:**
   - On phones the search toolbar takes three short rows (types, Filters + sort, view).
   - The topic page sort select is restyled in Phase 5.
+
+## Phase 5: topics and bookmarks (2026-11-11)
+
+- **Status:** done, pending human review.
+- **Files:**
+  - `src/pages/Feeds.tsx` (`TopicsPage`, `TopicPage`):
+    - **Topics:** artwork banner per topic; an activity badge from the newest item's date (Active today < 24 h, This week < 7 d, Quiet); "Updated X ago"; the article count; a share bar ("N% of topic labels", since an article can carry several categories, so the counts add up to more than the article total); the 3 latest articles; a container-based grid.
+    - **Topic page:** breadcrumb; artwork banner with icon, description and article count (height reserved while it loads); sort as a segmented control (Latest, Trending, Relevant, Quality; `sort` stays in the URL); view toggle.
+  - `src/pages/Bookmarks.tsx`:
+    - Header with the count and JSON/Markdown export (unchanged logic).
+    - Filters that run in the browser over the saved items: text, type, category (shown only when there's more than one), sort (recently saved or newest published), view toggle. All are kept in the URL.
+    - Count line ("4 of 9 bookmarks").
+    - An empty state with links to For You and Trending, and a no-match state with "Clear filters" (one URL update; three calls in one tick could overwrite each other).
+    - Bookmark storage and the export format are untouched.
+- **Checks:**
+  - lint, typecheck, Vitest 10, build: pass. Main JS 117.05 kB gzip.
+  - Playwright: pass.
+  - Screenshots: `/topics`, `/topics/cooling` and `/topics/power-energy?sort=trending&view=list` at 375/768/1440/1920 px in both themes; `/bookmarks` (grid, and the filtered list) at 320/375/1440 px, seeded with 9 real items from `/feeds/relevant`. No overflow.
+  - Lighthouse (mobile): `/topics` 97/100, `/topics/cooling` 90/100, `/topics/power-energy?view=list` 90/100, `/bookmarks` (empty) 97/100; desktop `/topics` 100/100. The topic pages first measured CLS 0.057 and 0.076 because the banner grew when its description loaded; now CLS 0 everywhere.
+- **Not possible without the backend:** a real trend per topic. `/trends` covers tags, companies and technologies, not categories, so the badge uses recency instead.
