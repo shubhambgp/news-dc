@@ -21,7 +21,7 @@ export function FeaturedCard({ item, label = 'Top story' }: { item: ItemSummary;
       data-card
       data-original={safeUrl(item.url)}
       tabIndex={-1}
-      className="group relative grid overflow-hidden rounded-2xl border bg-surface shadow-card outline-none transition hover:border-primary/40 hover:shadow-raised focus:ring-2 focus:ring-ring md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]"
+      className="group relative grid overflow-hidden rounded-2xl border bg-surface shadow-card outline-none transition hover:border-primary/40 hover:shadow-raised focus:ring-2 focus:ring-ring has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]"
     >
       <Cover slug={item.primary_category} className="min-h-40 md:min-h-56" iconClass="size-36 -right-4 -bottom-6">
         <Badge className="absolute top-3 left-3 z-10 rounded-full bg-primary px-2.5 text-primary-foreground">
@@ -51,7 +51,7 @@ export function FeaturedCard({ item, label = 'Top story' }: { item: ItemSummary;
 export function ArticleRow({ item, rank }: { item: ItemSummary; rank?: number }) {
   const { Icon, style } = categoryLook(item.primary_category)
   return (
-    <article className="group relative flex items-start gap-3 rounded-lg p-2 transition-colors hover:bg-elevated">
+    <article className="group relative flex items-start gap-3 rounded-lg p-2 transition-colors hover:bg-elevated has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
       <span className="cover relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg" style={style} aria-hidden>
         {rank != null ? <span className="text-sm font-bold text-white">{rank}</span> : <Icon className="size-5 text-white/85" />}
       </span>
@@ -74,7 +74,7 @@ export function TrendingRail({ items, start = 1 }: { items: ItemSummary[]; start
   return (
     <ol className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:scroll-px-6 sm:px-6 lg:mx-0 lg:scroll-px-0 lg:px-0">
       {items.map((i, n) => (
-        <li key={i.id} className="relative w-64 shrink-0 snap-start overflow-hidden rounded-xl border bg-surface shadow-card transition hover:border-primary/40 3xl:w-72">
+        <li key={i.id} className="relative w-64 shrink-0 snap-start overflow-hidden rounded-xl border bg-surface shadow-card transition hover:border-primary/40 3xl:w-72 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
           <Cover slug={i.primary_category} className="h-20" iconClass="size-14">
             <span className="absolute top-2 left-2 z-10 grid size-6 place-items-center rounded-md bg-black/45 text-xs font-bold text-white">{n + start}</span>
           </Cover>

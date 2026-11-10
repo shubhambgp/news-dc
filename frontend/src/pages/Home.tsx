@@ -36,7 +36,7 @@ function SectionTitle({ id, icon: Icon, iconClass, children, to, linkLabel }: { 
         {children}
       </h2>
       {to && (
-        <Link to={to} className="ml-auto inline-flex items-center gap-0.5 rounded text-xs font-medium text-primary-ink hover:underline">
+        <Link to={to} className="ml-auto inline-flex min-h-6 items-center gap-0.5 rounded px-1 text-xs font-medium text-primary-ink hover:underline">
           {linkLabel} <ArrowRight className="size-3" aria-hidden />
         </Link>
       )}
@@ -192,7 +192,7 @@ function Briefing() {
           <TrendingUp className="size-4 text-data" aria-hidden /> Rising this week
         </h2>
         <span className="text-xs text-muted-foreground">Tags and companies, last 7 days vs the 4 weeks before. The weekly AI briefing appears here on Mondays.</span>
-        <Link to="/dashboard" className="ml-auto inline-flex items-center gap-0.5 text-xs font-medium text-primary-ink hover:underline">
+        <Link to="/dashboard" className="ml-auto inline-flex min-h-6 items-center gap-0.5 text-xs font-medium text-primary-ink hover:underline">
           All signals <ArrowRight className="size-3" aria-hidden />
         </Link>
       </div>

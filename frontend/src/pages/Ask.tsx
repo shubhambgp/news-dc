@@ -164,7 +164,7 @@ export default function AskPage() {
         </section>
       }
     >
-      <div className="mx-auto flex min-h-[calc(100dvh-4rem-4.25rem-2.5rem-env(safe-area-inset-bottom))] max-w-3xl flex-col md:min-h-[calc(100dvh-4rem-3rem)]">
+      <div className="mx-auto flex min-h-[calc(100dvh-4rem-4.25rem-2.5rem-env(safe-area-inset-bottom))] max-w-3xl flex-col md:min-h-[calc(100dvh-4rem-3rem)] 3xl:max-w-4xl">
         {empty ? (
           <section aria-labelledby="ask-title" className="flex flex-1 flex-col justify-center py-6 text-center">
             <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-ai text-ai-foreground shadow-raised" aria-hidden>

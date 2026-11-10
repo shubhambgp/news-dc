@@ -258,3 +258,23 @@ Frontend only (`frontend/`). One entry per phase; plan in `UI_REDESIGN_PLAN.md`.
     - `/dashboard`: mobile 82/100, desktop 98/100.
     - `/admin`: mobile 94/100, desktop 98/100. These were measured on the error state, because the local proxy blocks `/admin/*`; the signed-in views were checked by screenshot only.
 - **Remaining:** the Dashboard mobile performance score (82) is held back by the Recharts chunk; nothing in this phase made it bigger.
+
+## Phase 8: responsive and visual QA (2026-11-11)
+
+- **Status:** done, pending human review.
+- **Report:** `docs/RESPONSIVE_QA_REPORT.md` (method, the 234-capture matrix, audits, Lighthouse, 1440 vs 1920, every issue fixed, limitations).
+- **Files:**
+  - `src/components/ui/badge.tsx`: linked overlay badges are at least 24 px tall.
+  - `src/components/ItemCard.tsx`: the comment link is at least 24×24 px; the card rings when its title link has keyboard focus.
+  - `src/components/ArticleCards.tsx`: the same card focus ring on the featured card, the rows and the trending rail.
+  - `src/pages/Home.tsx`: section links at least 24 px.
+  - `src/pages/Feeds.tsx`: topic card focus ring, taller latest links, breadcrumb padding.
+  - `src/pages/Article.tsx`: 24 px breadcrumbs, entities, tags and source links.
+  - `src/pages/Dashboard.tsx`: 24 px rising-term links (block + truncate), "Show as table" and the Admin link.
+  - `src/pages/Ask.tsx`: conversation 896 px from 1920 px.
+- **Checks (final):**
+  - lint, typecheck, Vitest 10, build: pass. Main JS 117.0 kB gzip.
+  - Playwright: pass.
+  - 234 of 234 captures with no overflow, no blank page and no page error.
+  - 0 targets under 24 px and 0 clipped elements on 8 routes at 375 and 1440 px.
+  - Lighthouse accessibility 100 on all 11 routes measured (mobile) and 5 on desktop.

@@ -170,7 +170,7 @@ export default function ArticlePage() {
             <dt className="mb-1 text-xs text-muted-foreground capitalize">{k}</dt>
             <dd className="flex flex-wrap gap-1.5">
               {v.map((e) => (
-                <Link key={e} to={`/search?q=${encodeURIComponent(e)}`} className="rounded-md border bg-surface px-2 py-0.5 text-xs hover:bg-elevated">
+                <Link key={e} to={`/search?q=${encodeURIComponent(e)}`} className="inline-flex min-h-6 items-center rounded-md border bg-surface px-2 text-xs hover:bg-elevated">
                   {e}
                 </Link>
               ))}
@@ -181,7 +181,7 @@ export default function ArticlePage() {
       {item.tags.length > 0 && (
         <p className="mt-3 flex flex-wrap gap-1.5">
           {item.tags.map((t) => (
-            <Link key={t} to={`/search?q=${encodeURIComponent(t)}`} className="rounded-md bg-elevated px-1.5 py-0.5 text-xs text-foreground/85 hover:text-foreground">
+            <Link key={t} to={`/search?q=${encodeURIComponent(t)}`} className="inline-flex min-h-6 items-center rounded-md bg-elevated px-1.5 text-xs text-foreground/85 hover:text-foreground">
               #{t}
             </Link>
           ))}
@@ -208,13 +208,13 @@ export default function ArticlePage() {
     >
       <article data-card-page className="mx-auto max-w-3xl">
         <nav aria-label="Breadcrumb" className="mb-3 text-xs text-muted-foreground">
-          <Link to="/" className="hover:text-foreground hover:underline">
+          <Link to="/" className="inline-block py-1 hover:text-foreground hover:underline">
             Home
           </Link>
           {item.primary_category && (
             <>
               <span aria-hidden> / </span>
-              <Link to={`/topics/${item.primary_category}`} className="hover:text-foreground hover:underline">
+              <Link to={`/topics/${item.primary_category}`} className="inline-block py-1 hover:text-foreground hover:underline">
                 {name(item.primary_category)}
               </Link>
             </>
@@ -318,7 +318,7 @@ export default function ArticlePage() {
           <ul className="divide-y rounded-xl border bg-surface text-sm">
             {original && (
               <li className="flex flex-wrap items-baseline justify-between gap-2 p-3">
-                <a href={original} target="_blank" rel="noopener noreferrer" className="font-medium text-primary-ink hover:underline">
+                <a href={original} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-6 items-center font-medium text-primary-ink hover:underline">
                   {publisher} (original)
                 </a>
                 <span className="text-xs text-muted-foreground">{timeAgo(item.published_at)}</span>
@@ -326,7 +326,7 @@ export default function ArticlePage() {
             )}
             {others.map((c) => (
               <li key={c.source.key + c.url} className="flex flex-wrap items-baseline justify-between gap-2 p-3">
-                <a href={safeUrl(c.url)} target="_blank" rel="noopener noreferrer" className="text-primary-ink hover:underline">
+                <a href={safeUrl(c.url)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-6 items-center text-primary-ink hover:underline">
                   Found by {c.source.name}
                 </a>
                 <span className="text-xs text-muted-foreground">{timeAgo(c.published_at ?? c.first_seen_at)}</span>
@@ -334,7 +334,7 @@ export default function ArticlePage() {
             ))}
             {item.also_covered_by.map((d) => (
               <li key={d.id} className="flex flex-wrap items-baseline justify-between gap-2 p-3">
-                <a href={safeUrl(d.url)} target="_blank" rel="noopener noreferrer" className="min-w-0 text-primary-ink hover:underline">
+                <a href={safeUrl(d.url)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-6 items-center min-w-0 text-primary-ink hover:underline">
                   {d.title}
                 </a>
                 <span className="text-xs text-muted-foreground">
@@ -344,7 +344,7 @@ export default function ArticlePage() {
             ))}
             {pdf && (
               <li className="p-3">
-                <a href={safeUrl(pdf.url)} target="_blank" rel="noopener noreferrer" className="text-primary-ink hover:underline">
+                <a href={safeUrl(pdf.url)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-6 items-center text-primary-ink hover:underline">
                   PDF version
                 </a>
               </li>
@@ -357,7 +357,7 @@ export default function ArticlePage() {
             <ul className="space-y-2 text-sm">
               {hn && (
                 <li>
-                  <a href={hn} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-primary-ink hover:underline">
+                  <a href={hn} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-6 items-center gap-1.5 text-primary-ink hover:underline">
                     <MessageSquare className="size-4" aria-hidden /> Hacker News discussion
                     {item.comments_count != null && ` (${item.comments_count} comments, ${item.points ?? 0} points)`}
                   </a>
@@ -367,7 +367,7 @@ export default function ArticlePage() {
                 .filter((d) => d.url !== item.discussion_url)
                 .map((d) => (
                   <li key={d.url}>
-                    <a href={safeUrl(d.url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-primary-ink hover:underline">
+                    <a href={safeUrl(d.url)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-6 items-center gap-1.5 text-primary-ink hover:underline">
                       <MessageSquare className="size-4" aria-hidden /> HN: {d.title ?? 'discussion'} ({d.comments ?? 0} comments)
                     </a>
                   </li>

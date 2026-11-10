@@ -33,7 +33,7 @@ function Panel({ title, description, children, rows, className }: { title: strin
       <div className="mt-4">{children}</div>
       {rows && (
         <details className="mt-3 text-xs">
-          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Show as table</summary>
+          <summary className="cursor-pointer py-1 text-muted-foreground hover:text-foreground">Show as table</summary>
           <table className="mt-2 w-full">
             <tbody>
               {rows.map((r) => (
@@ -93,7 +93,7 @@ function Rising({ title, terms }: { title: string; terms: RisingTerm[] }) {
         <ol className="space-y-1.5 text-sm">
           {terms.slice(0, 6).map((t) => (
             <li key={t.term} className="flex items-baseline justify-between gap-2">
-              <Link to={`/search?q=${encodeURIComponent(t.term)}`} className="min-w-0 truncate hover:underline">
+              <Link to={`/search?q=${encodeURIComponent(t.term)}`} className="block min-w-0 truncate leading-6 hover:underline">
                 {t.term}
               </Link>
               <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-success-ink tabular-nums" title={`${t.recent} items this week, ${t.baseline} in the 4 weeks before`}>
@@ -303,7 +303,7 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
-          <Link to="/admin" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary-ink hover:underline">
+          <Link to="/admin" className="mt-3 inline-flex min-h-6 items-center gap-1 text-xs font-medium text-primary-ink hover:underline">
             Admin <ArrowUpRight className="size-3" />
           </Link>
         </Panel>

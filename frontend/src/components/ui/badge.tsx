@@ -18,7 +18,7 @@ const badgeVariants = cva(
         destructive: "bg-destructive/12 text-destructive-ink",
         outline: "border-border text-foreground [a&]:hover:bg-elevated",
         // On category artwork (always dark), so fixed white.
-        overlay: "rounded-full bg-black/40 px-2.5 text-white backdrop-blur-sm [a&]:hover:bg-black/55",
+        overlay: "rounded-full bg-black/40 px-2.5 text-white backdrop-blur-sm [a&]:min-h-6 [a&]:py-1 [a&]:hover:bg-black/55",
       },
     },
     defaultVariants: {

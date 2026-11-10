@@ -96,7 +96,7 @@ export function TopicsPage() {
           const act = activity(t.latest[0]?.published_at)
           const share = total ? Math.round((t.item_count / total) * 100) : 0
           return (
-            <article key={t.slug} className="group relative flex flex-col overflow-hidden rounded-xl border bg-surface shadow-card transition hover:border-primary/40 hover:shadow-raised">
+            <article key={t.slug} className="group relative flex flex-col overflow-hidden rounded-xl border bg-surface shadow-card transition hover:border-primary/40 hover:shadow-raised has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
               <Cover slug={t.slug} className="flex h-24 items-end gap-2 p-4" iconClass="size-20">
                 <h2 className="relative z-10 min-w-0 flex-1 text-lg leading-tight font-semibold text-white">
                   <Link to={`/topics/${t.slug}`} className="after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none">
@@ -123,7 +123,7 @@ export function TopicsPage() {
                   <ul className="relative z-10 mt-3 space-y-2 border-t pt-3 text-sm">
                     {t.latest.map((i) => (
                       <li key={i.id} className="leading-snug">
-                        <Link to={`/article/${i.id}`} className="line-clamp-2 hover:text-primary-ink hover:underline focus-visible:underline focus-visible:outline-none">
+                        <Link to={`/article/${i.id}`} className="line-clamp-2 py-1 hover:text-primary-ink hover:underline">
                           {i.title}
                         </Link>
                         <span className="text-xs text-muted-foreground">
@@ -180,7 +180,7 @@ export function TopicPage() {
   return (
     <>
       <nav aria-label="Breadcrumb" className="mb-3 text-xs text-muted-foreground">
-        <Link to="/topics" className="hover:text-foreground hover:underline">
+        <Link to="/topics" className="inline-block py-1 hover:text-foreground hover:underline">
           Topics
         </Link>
         <span aria-hidden> / </span>

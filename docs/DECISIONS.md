@@ -301,3 +301,12 @@ Each entry: context, options, decision, why, trade-offs, and whether it changes 
 - **Grid columns** follow the container (`@container` queries), not the viewport, so the same `CardGrid` works next to the home sidebar, in the article's related list and on full-width pages.
 - **No web font:** the CSP has `font-src 'self'`; system fonts are kept.
 - **Trade-offs:** cards are taller than the old rows, so fewer items show per screen; home TBT went from about 250 to 410 ms on mobile (Lighthouse mobile perf 86 to 90, desktop 98; accessibility 100). Deviation from plan §7 Phase 9 visuals only; no API or data change.
+
+- **2026-11-11, NewsDC 2.0 (phases 0–8 of a frontend-only redesign brief):** the D-039 round was extended into a full redesign of every page, still only under `frontend/`. The plan, design system, phase changelog and QA report are in `frontend/docs/` (`UI_REDESIGN_PLAN.md`, `UI_DESIGN_SYSTEM.md`, `UI_REDESIGN_CHANGELOG.md`, `RESPONSIVE_QA_REPORT.md`). Choices:
+  - the brief's palette, with darker light-mode text where the brief failed AA
+  - Inter self-hosted (`@fontsource-variable/inter` 5.3.0, CSP `font-src 'self'`)
+  - a CSS-only tooltip instead of Radix (17.6 kB gzip)
+  - `public/theme-init.js` against the theme flash
+  - a grid shell with a tablet rail and a 2240 px cap
+  - For You on home limited to "Load more", so the sections after it are reachable
+  - frontend alternatives where data is missing: no images, logos, reading time, daily brief or per-topic trend (plan §2)

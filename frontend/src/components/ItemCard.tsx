@@ -68,7 +68,7 @@ export function ItemCard({ item, reason, children, dismissible = true, kicker, l
         </span>
       )}
       {item.comments_count != null && item.comments_count > 0 && discussion && (
-        <a href={discussion} target="_blank" rel="noopener noreferrer" className="relative z-10 inline-flex items-center gap-0.5 hover:text-foreground hover:underline">
+        <a href={discussion} target="_blank" rel="noopener noreferrer" className="relative z-10 inline-flex min-h-6 min-w-6 items-center justify-center gap-0.5 hover:text-foreground hover:underline">
           <MessageSquare className="size-3" aria-hidden />
           {item.comments_count}
           <span className="sr-only"> comments</span>
@@ -130,7 +130,7 @@ export function ItemCard({ item, reason, children, dismissible = true, kicker, l
       tabIndex={-1}
       aria-labelledby={`t-${item.id}`}
       className={cn(
-        'group relative rounded-xl border bg-surface shadow-card outline-none transition',
+        'group relative rounded-xl border bg-surface shadow-card outline-none transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring',
         'hover:border-primary/40 hover:shadow-raised focus-visible:ring-2 focus-visible:ring-ring focus:ring-2 focus:ring-ring',
         row ? 'flex gap-3 p-3 sm:gap-4' : 'flex h-full flex-col hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0',
         read && 'opacity-60',
