@@ -16,7 +16,7 @@ export function Markdown({ text, known, idPrefix = 'src' }: { text: string; know
               return (
                 <a
                   href={href}
-                  className="mx-0.5 rounded bg-primary/10 px-1 text-xs font-medium text-primary no-underline hover:bg-primary/20"
+                  className="mx-0.5 rounded-md bg-primary/12 px-1.5 py-0.5 text-xs font-semibold text-primary-ink no-underline hover:bg-primary/20"
                   aria-label={`Source ${href.slice(idPrefix.length + 2)}`}
                 >
                   {children}

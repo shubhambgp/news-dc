@@ -191,3 +191,32 @@ Frontend only (`frontend/`). One entry per phase; plan in `UI_REDESIGN_PLAN.md`.
   - Screenshots: `/topics`, `/topics/cooling` and `/topics/power-energy?sort=trending&view=list` at 375/768/1440/1920 px in both themes; `/bookmarks` (grid, and the filtered list) at 320/375/1440 px, seeded with 9 real items from `/feeds/relevant`. No overflow.
   - Lighthouse (mobile): `/topics` 97/100, `/topics/cooling` 90/100, `/topics/power-energy?view=list` 90/100, `/bookmarks` (empty) 97/100; desktop `/topics` 100/100. The topic pages first measured CLS 0.057 and 0.076 because the banner grew when its description loaded; now CLS 0 everywhere.
 - **Not possible without the backend:** a real trend per topic. `/trends` covers tags, companies and technologies, not categories, so the badge uses recency instead.
+
+## Phase 6: article detail and Ask AI (2026-11-11)
+
+- **Status:** done, pending human review.
+- **Files:**
+  - `src/pages/Article.tsx`:
+    - breadcrumb; artwork header with every category badge; headline up to 36 px at 1920 px; source row with an avatar, author, date and via
+    - actions: Read original, Bookmark, **Share** (`navigator.share`, or copy the link with a "Link copied" confirmation), Not interested
+    - **AI content is marked:** a violet `.ai-block` "AI summary" with an "AI-generated" badge, a word count and a disclaimer; "Key takeaways (AI-generated)" split into Technical insights and Business implications (two columns only when both exist)
+    - **Publisher content is marked:** "From the publisher" (`item.description`, shown as a quote and attributed)
+    - **Sources and coverage:** the original, every other source that found the URL, near-duplicates, the PDF
+    - Discussion
+    - right panel from 1280 px with Entities and tags and Related (compact rows); below that width both move inline
+    - an article-shaped skeleton
+  - `src/pages/Ask.tsx` (presentation only; the request, SSE handling, history and citation logic are unchanged):
+    - empty state: icon, heading and suggestion cards in two columns
+    - user bubble on the right; AI messages with an avatar, "NewsDC AI" and an "AI-generated · N sources" badge
+    - retrieval and writing states with pulsing dots; source skeletons while retrieving; a blinking cursor while tokens stream
+    - numbered source cards (the `src-{turn}-{n}` anchors are kept)
+    - errors in an alert with "Ask again"
+    - a composer pinned above the bottom bar and the safe area on phones and at the bottom on desktop, with an `ai` send button, a follow-up placeholder and the Enter/Shift+Enter hint
+    - right panel "How answers work" from 1280 px
+  - `src/components/Markdown.tsx`: citation chips use `primary-ink` (AA in light mode).
+- **Not possible without the backend:** reading time. The API returns no article length, so the summary shows its own word count instead.
+- **Checks:**
+  - lint, typecheck, Vitest 10, build: pass. Main JS 117.0 kB gzip.
+  - Playwright: pass. It covers the streamed answer, the `[1]` → `#src-0-1` anchor and the source link.
+  - Screenshots: `/ask` (empty, and with an answer) and `/article/1281` at 320/375/430/768/1440/1920/2560 px in both themes. The answer screenshots use a canned SSE stream injected by the QA script, labelled "QA fixture answer" on screen, with real items as sources. No paid call was made. No overflow.
+  - Lighthouse: mobile `/ask` 95/100 (CLS 0.022), `/article/1281` 91/100; desktop `/ask` 100/100, `/article/1281` 98/100.
