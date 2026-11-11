@@ -111,6 +111,8 @@ test('home → pick topics → article → bookmark → bookmarks → search →
   await page.keyboard.press('t')
   await page.reload()
   await expect(page.locator('html')).toHaveClass(dark ? /^(?!.*dark)/ : /dark/)
+  // The theme class is set by an inline script before React mounts; wait for the app (and its key handler).
+  await expect(page.locator('#site-search')).toBeVisible()
   await page.keyboard.press('Escape')
   await page.keyboard.press('?')
   await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible()
