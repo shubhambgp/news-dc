@@ -4,6 +4,8 @@ How NewsDC is put together: the processes, the ingestion and AI workflow, Ask Ne
 
 ## System
 
+An editable version of the system and pipeline diagrams is in [diagrams/newsdc.excalidraw](diagrams/newsdc.excalidraw) (open it at excalidraw.com or with the VS Code Excalidraw extension).
+
 ```mermaid
 flowchart LR
   B[Browser<br/>React SPA + localStorage profile] -->|HTTPS| C[Caddy<br/>TLS, headers, compression]
