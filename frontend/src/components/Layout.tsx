@@ -266,9 +266,7 @@ export function Layout() {
             <Menu />
           </Button>
           <Link to="/" className="flex shrink-0 items-center gap-2.5 rounded-lg md:justify-center lg:justify-start lg:px-5">
-            <span className="bg-brand grid size-9 place-items-center rounded-xl text-xs font-extrabold tracking-tight text-white shadow-card" aria-hidden>
-              DC
-            </span>
+            <img src="/logo.png" alt="" width={36} height={36} className="size-9" />
             <span className="hidden leading-tight lg:block">
               <span className="block text-base font-bold tracking-tight">NewsDC</span>
               <span className="block text-2xs font-medium text-muted-foreground">Data Center Intelligence</span>

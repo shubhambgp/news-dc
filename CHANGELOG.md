@@ -2,6 +2,11 @@
 
 All notable changes, grouped by build phase. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- New NewsDC logo in the header and as the favicon (`favicon.png`, `apple-touch-icon.png`); the source image is `docs/img/logo.png`. Removed `favicon.svg`.
+
 ## [1.0.0] - 2026-11-11
 
 ### Phase 11: Polish, docs & presentation (2026-11-11)
