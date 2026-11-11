@@ -103,7 +103,7 @@ f=backups/newsdc-<timestamp>.dump.gpg
 docker compose -f docker-compose.prod.yml stop backend worker
 docker compose -f docker-compose.prod.yml exec -T db dropdb -U newsdc newsdc
 docker compose -f docker-compose.prod.yml exec -T db createdb -U newsdc newsdc
-gpg --batch --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" -d "$f" \
+gpg --batch --pinentry-mode loopback --passphrase-fd 3 -d "$f" 3<<<"$BACKUP_PASSPHRASE" \
   | docker compose -f docker-compose.prod.yml exec -T db pg_restore -U newsdc -d newsdc --no-owner
 docker compose -f docker-compose.prod.yml start backend worker
 ```

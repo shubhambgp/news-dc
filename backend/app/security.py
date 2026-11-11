@@ -8,6 +8,7 @@ objects without one, so slowapi silently exempted every route (D-030).
 import base64
 import hashlib
 import hmac
+import ipaddress
 import json
 import secrets
 import time
@@ -16,6 +17,7 @@ from dataclasses import dataclass
 from limits import RateLimitItem, parse
 from limits.storage import MemoryStorage
 from limits.strategies import MovingWindowRateLimiter
+from starlette.requests import Request
 
 from app.config import get_settings
 
@@ -31,6 +33,17 @@ RATE_LIMIT_EXEMPT = frozenset({"/api/v1/health", "/api/v1/ready"})  # probes pol
 def allow(client: str, limit: RateLimitItem = DEFAULT_LIMIT, scope: str = "default") -> bool:
     """Count one request for `client`; False once it is over `limit` in the moving window."""
     return _limiter.hit(limit, scope, client)
+
+
+def client_key(request: Request) -> str:
+    """The rate-limit key: the client IP, or its /64 for IPv6 (one subscriber usually gets a
+    whole /64, so per-address keys would give them billions of allowances)."""
+    host = request.client.host if request.client else "unknown"
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return host
+    return str(ipaddress.ip_network(f"{ip}/64", strict=False)) if ip.version == 6 else host
 
 
 def reset_rate_limits() -> None:
@@ -50,8 +63,10 @@ API_CSP = "default-src 'none'; frame-ancestors 'none'"
 # --- Admin sessions (Phase 8, §11.9) -----------------------------------------------------------
 # A session is a signed cookie: base64url(JSON {sid, csrf, exp}) + "." + HMAC-SHA256 with
 # SESSION_SECRET (never ADMIN_TOKEN). Stateless, so a logout is remembered in memory until expiry.
+# The key also mixes in a per-boot value: a restart forgets logouts, so it ends every session too.
 SESSION_COOKIE = "newsdc_admin"
 CSRF_HEADER = "X-CSRF-Token"
+_BOOT_KEY = secrets.token_hex(16)
 
 
 @dataclass(frozen=True)
@@ -66,7 +81,7 @@ def _b64(raw: bytes) -> str:
 
 
 def _sig(body: str, secret: str) -> str:
-    return _b64(hmac.new(secret.encode(), body.encode(), hashlib.sha256).digest())
+    return _b64(hmac.new((secret + _BOOT_KEY).encode(), body.encode(), hashlib.sha256).digest())
 
 
 def check_admin_token(supplied: str, expected: str) -> bool:

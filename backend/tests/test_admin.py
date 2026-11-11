@@ -178,12 +178,19 @@ def test_session_cookie_signed_with_secret_not_token():
     assert read_session(cookie, TOKEN) is None
 
 
+def test_restart_ends_every_session(monkeypatch):
+    _, cookie = new_session(SECRET, 30)
+    monkeypatch.setattr(security, "_BOOT_KEY", "another-boot")  # what a restart does
+    assert read_session(cookie, SECRET) is None
+
+
 def test_md_escaping_and_links():
     assert md_text("a <script>x</script> *b* [c](d)\n# h") == (
         r"a \<script\>x\</script\> \*b\* \[c\](d) \# h"
     )
     assert md_link("T", "javascript:alert(1)") == "T"
     assert md_link("T", "https://x.example/a b>c") == "[T](<https://x.example/a%20b%3Ec>)"
+    assert md_link("T", "https://x.example/a\n\n[c](d)") == "[T](<https://x.example/a%0A%0A[c](d)>)"
 
 
 def test_markdown_groups_by_category():

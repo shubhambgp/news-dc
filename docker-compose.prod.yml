@@ -9,7 +9,10 @@ x-backend: &backend
   restart: unless-stopped
   logging: *logging
   env_file: .env
+  # Runs as uid 10001 on port 8000: needs no capabilities.
+  cap_drop: [ALL]
   environment:
+    API_DOCS: "false"  # Swagger UI loads a CDN script on the admin's origin
     DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-newsdc}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-newsdc}
     FASTEMBED_CACHE_PATH: /models  # downloaded on first use, kept in the volume
   volumes:
@@ -55,9 +58,10 @@ services:
     build: ./frontend
     restart: unless-stopped
     logging: *logging
+    cap_drop: [ALL]  # unprivileged Nginx on port 8080
 
   caddy:
-    image: caddy:2.10-alpine
+    image: caddy:2.11-alpine
     restart: unless-stopped
     logging: *logging
     ports:

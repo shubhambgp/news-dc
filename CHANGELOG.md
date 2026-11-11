@@ -4,6 +4,21 @@ All notable changes, grouped by build phase. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Security audit fixes (2026-11-11)
+
+Fixes for the audit in `security-audit/` (audited `8b4c0f0`). Decisions in D-040, triage in `docs/SECURITY.md#audit-2026-11-10`.
+
+#### Security
+- `/ask` has a limit for all clients together (`RATE_LIMIT_ASK_GLOBAL`, default `30/minute;500/day`), so the Anthropic spend has a ceiling however many IPs send requests (NDC-01).
+- At most 8 Ask answers stream at once. Past that, the stream ends with an `error` event, code `busy`, and no LLM call is made, which keeps worker threads free for the rest of the API (NDC-05).
+- The fetcher connects only to the address it has just checked, which closes the DNS-rebinding window (NDC-02). NAT64 addresses are refused (NDC-19). Each request must finish within 60 s (NDC-13). `Authorization` is dropped when a redirect goes to another host (NDC-17).
+- URLs containing control characters are rejected at ingestion, and the Markdown export percent-encodes them (NDC-16).
+- Rate limits key IPv6 clients by /64 (NDC-06). Admin sessions end when the backend restarts, so a logout can't be undone by a restart (NDC-08).
+- Links written by the model (Ask answers, trend brief) render as plain text. Only `[n]` citations stay links (NDC-07).
+- `API_DOCS=false` in production turns off Swagger UI and `openapi.json` (NDC-15).
+- Production: `cap_drop: [ALL]` on backend, worker and frontend (NDC-10). Caddy is 2.11 and Nginx 1.30. `deploy.sh` pulls `db`/`caddy` and rebuilds with `--pull`, so security rebuilds of the same tags reach the server (NDC-24).
+- The restore command reads the backup passphrase from a file descriptor, not the command line (NDC-22).
+
 ### Phase 10: Production Docker & deployment (2026-11-10)
 
 #### Added

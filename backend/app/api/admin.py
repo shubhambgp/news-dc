@@ -45,6 +45,7 @@ from app.security import (
     AdminSession,
     allow,
     check_admin_token,
+    client_key,
     new_session,
     origin_allowed,
     read_session,
@@ -109,7 +110,7 @@ def login(body: AdminLogin, request: Request, response: Response) -> AdminSessio
     (`RATE_LIMIT_ADMIN_LOGIN`, 5/minute) and for all clients together (30/minute)."""
     _enabled()
     _check_origin(request)
-    client = request.client.host if request.client else "unknown"
+    client = client_key(request)
     # Per IP first, so one noisy client doesn't use up the global budget for everyone.
     if not allow(client, LOGIN_LIMIT, "admin_login") or not allow(
         "all", LOGIN_LIMIT_GLOBAL, "admin_login_global"

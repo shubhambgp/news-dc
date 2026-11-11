@@ -18,6 +18,7 @@ from typing import Any
 from urllib.parse import urljoin, urlsplit, urlunsplit
 from urllib.robotparser import RobotFileParser
 
+import httpcore
 import httpx
 import trafilatura
 from pydantic import BaseModel, Field, field_validator
@@ -177,8 +178,11 @@ class RawItem(BaseModel):
     @field_validator("url")
     @classmethod
     def _url(cls, v: str) -> str:
+        v = v.strip()
+        if any(ord(c) < 32 or ord(c) == 127 for c in v):  # urlsplit drops them; we'd store them
+            raise ValueError("control character in URL")
         canonicalize_url(v)  # raises ValueError for unusable URLs
-        return v.strip()
+        return v
 
     @field_validator("published_at")
     @classmethod
@@ -223,31 +227,59 @@ class TransientFetchError(FetchError):
 MAX_REDIRECTS = 5
 MAX_BYTES = 5_000_000
 MAX_RETRY_AFTER = 120.0
+FETCH_DEADLINE = 60.0  # seconds per request; the httpx timeout only bounds each read
 TRANSIENT_STATUSES = frozenset({429, 500, 502, 503, 504})
+# NAT64 prefixes embed an IPv4 address; Python counts 64:ff9b::/96 as global.
+NAT64 = (ipaddress.ip_network("64:ff9b::/96"), ipaddress.ip_network("64:ff9b:1::/48"))
 
 
 def _resolve(host: str, port: int) -> list[str]:
     return [str(ai[4][0]) for ai in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)]
 
 
+def _public_addrs(host: str, port: int) -> list[str]:
+    """Every address `host` resolves to; UnsafeURLError if any of them is not public."""
+    try:
+        addrs = _resolve(host, port)
+    except (OSError, ValueError, UnicodeError) as exc:
+        raise PermanentFetchError(f"cannot resolve {host}: {exc}") from exc
+    for addr in addrs:
+        ip = ipaddress.ip_address(addr.split("%", 1)[0])
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+            ip = ip.ipv4_mapped
+        if not ip.is_global or ip.is_multicast or any(ip in net for net in NAT64):
+            raise UnsafeURLError(f"{host} resolves to non-public address {ip}")
+    return addrs
+
+
 def check_public_url(url: str) -> None:
-    """SSRF guard (§11.6): http(s) only, and every address the host resolves to is public."""
+    """SSRF guard (§11.6): http(s) only, and every address the host resolves to is public.
+    The connection itself is pinned to checked addresses by `_PinnedBackend`."""
     parts = urlsplit(url)
     if parts.scheme not in DEFAULT_PORTS or not parts.hostname:
         raise UnsafeURLError(f"unsupported URL: {url[:200]}")
     try:
         port = parts.port or DEFAULT_PORTS[parts.scheme]
-        addrs = _resolve(parts.hostname, port)
-    except (OSError, ValueError, UnicodeError) as exc:
-        raise PermanentFetchError(f"cannot resolve {parts.hostname}: {exc}") from exc
-    for addr in addrs:
-        ip = ipaddress.ip_address(addr.split("%", 1)[0])
-        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
-            ip = ip.ipv4_mapped
-        if not ip.is_global or ip.is_multicast:
-            raise UnsafeURLError(f"{parts.hostname} resolves to non-public address {ip}")
-    # ponytail: check-then-connect leaves a DNS-rebinding window; pin the resolved IP in a
-    # custom transport if sources ever become user-supplied.
+    except ValueError as exc:
+        raise PermanentFetchError(f"bad port in {url[:200]}") from exc
+    _public_addrs(parts.hostname, port)
+
+
+class _PinnedBackend(httpcore.SyncBackend):
+    """Resolves, checks and connects to the same address, so a DNS answer that changes after
+    `check_public_url` (rebinding) can't point the connection at an internal host. TLS still
+    uses the hostname for SNI and certificate checks (httpcore passes it to start_tls)."""
+
+    def connect_tcp(
+        self, host: str, port: int, *args: Any, **kwargs: Any
+    ) -> httpcore.NetworkStream:
+        error: Exception | None = None
+        for addr in _public_addrs(host, port):  # in order, like socket.create_connection
+            try:
+                return super().connect_tcp(addr, port, *args, **kwargs)
+            except (httpcore.ConnectError, httpcore.ConnectTimeout) as exc:
+                error = exc
+        raise error or httpcore.ConnectError(f"no address for {host}")
 
 
 def _retry_after(headers: httpx.Headers) -> float:
@@ -325,7 +357,12 @@ class Http:
         attempts: int = 4,
         sleep: Callable[[float], None] | None = None,
     ) -> None:
+        transport = httpx.HTTPTransport()
+        # httpx has no public hook for this; test_connections_are_pinned_to_checked_addresses
+        # fails if an upgrade moves the attribute.
+        transport._pool._network_backend = _PinnedBackend()
         self._client = httpx.Client(
+            transport=transport,
             timeout=httpx.Timeout(timeout, connect=5.0),
             headers={"User-Agent": USER_AGENT},
             follow_redirects=False,
@@ -380,10 +417,13 @@ class Http:
         for _ in range(MAX_REDIRECTS + 1):
             check_public_url(url)
             self._throttle()
+            deadline = time.monotonic() + FETCH_DEADLINE  # after the throttle: queueing is fine
             with self._client.stream("GET", url, params=params, headers=headers) as r:
                 if r.has_redirect_location:
                     url = urljoin(str(r.url), r.headers["location"])
                     params = None  # already part of the Location URL
+                    if headers and httpx.URL(url).host != r.url.host:  # token stays on its host
+                        headers = {k: v for k, v in headers.items() if k.lower() != "authorization"}
                     continue
                 _raise_for_status(r)
                 declared = r.headers.get("content-length", "")
@@ -394,6 +434,8 @@ class Http:
                     body += chunk
                     if len(body) > max_bytes:
                         raise PermanentFetchError(f"response larger than {max_bytes} bytes")
+                    if time.monotonic() > deadline:  # a trickling server never hits a timeout
+                        raise PermanentFetchError(f"response slower than {FETCH_DEADLINE}s")
                 return Fetched(str(r.url), r.status_code, r.headers, bytes(body))
         raise PermanentFetchError(f"more than {MAX_REDIRECTS} redirects")
 

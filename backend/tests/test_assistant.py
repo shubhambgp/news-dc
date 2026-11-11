@@ -4,12 +4,14 @@ re-ranking and the SSE endpoint with a fake LLM and stubbed retrieval."""
 import asyncio
 import hashlib
 import json
+import threading
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import pytest
 from fakes import FakeChat, FakeEmbedder
 from fastapi.testclient import TestClient
+from limits import parse_many
 
 from app.ai import assistant
 from app.ai.assistant import CitationFilter, Evidence, build_messages, render_sources
@@ -326,6 +328,25 @@ def test_ask_has_its_own_rate_limit(chat):
     r = client.post("/api/v1/ask", json={"question": "liquid cooling?"})
     assert r.status_code == 429 and r.json()["error"]["code"] == "rate_limited"
     assert client.get("/api/v1/ask/suggestions").status_code == 200  # other routes unaffected
+
+
+def test_ask_has_a_limit_for_all_clients_together(chat, monkeypatch):
+    monkeypatch.setattr(ask, "ASK_GLOBAL_LIMITS", parse_many("2/minute"))
+    for _ in range(2):
+        assert client.post("/api/v1/ask", json={"question": "liquid cooling?"}).status_code == 200
+    r = client.post("/api/v1/ask", json={"question": "liquid cooling?"})
+    assert r.status_code == 429 and r.json()["error"]["code"] == "rate_limited"
+    assert len(chat.calls) == 2
+
+
+def test_concurrent_answers_are_capped(chat, monkeypatch):
+    events(client.post("/api/v1/ask", json={"question": "liquid cooling?"}))
+    assert ask._streams.acquire(blocking=False)  # the finished answer gave its slot back
+    ask._streams.release()
+    monkeypatch.setattr(ask, "_streams", threading.BoundedSemaphore(1))
+    assert ask._streams.acquire(blocking=False)  # one answer still streaming
+    evs = events(client.post("/api/v1/ask", json={"question": "liquid cooling?"}))
+    assert evs[-1] == ("error", ask.BUSY) and len(chat.calls) == 1
 
 
 def test_unconfigured_assistant_is_503(monkeypatch):

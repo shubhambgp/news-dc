@@ -1,9 +1,8 @@
 import ReactMarkdown from 'react-markdown'
 
-import { safeUrl } from '@/lib/format'
-
-/** Untrusted Markdown (model output): react-markdown never renders raw HTML, links must be
- * http(s), and `[n]` becomes a link to source card `#<idPrefix>-n` when `n` is a known source. */
+/** Untrusted Markdown (model output): react-markdown never renders raw HTML, and `[n]` becomes a
+ * link to source card `#<idPrefix>-n` when `n` is a known source. Any other link is shown as
+ * plain text: sources already have cards, and a link the model wrote may be injected phishing. */
 export function Markdown({ text, known, idPrefix = 'src' }: { text: string; known: Set<number>; idPrefix?: string }) {
   const withCites = text.replace(/\[(\d{1,2})\](?!\()/g, (m, n) => (known.has(Number(n)) ? `[\\[${n}\\]](#${idPrefix}-${n})` : m))
   return (
@@ -22,14 +21,7 @@ export function Markdown({ text, known, idPrefix = 'src' }: { text: string; know
                   {children}
                 </a>
               )
-            const url = safeUrl(href)
-            return url ? (
-              <a href={url} target="_blank" rel="noopener noreferrer nofollow">
-                {children}
-              </a>
-            ) : (
-              <span>{children}</span>
-            )
+            return <span>{children}</span>
           },
           img: () => null,
         }}

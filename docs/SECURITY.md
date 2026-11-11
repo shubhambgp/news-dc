@@ -46,20 +46,20 @@ The human should rotate the Anthropic key that was pasted into a chat during Pha
 
 ## Rate limits
 
-`app/security.py`, in-process (R-017, R-018): 60/minute per IP on every route except `/health` and `/ready`, 10/minute for `/ask`, and the login limits above. Tests in `tests/test_api.py` and `tests/test_admin.py`.
+`app/security.py`, in-process (R-017, R-018): 60/minute per IP on every route except `/health` and `/ready`, 10/minute per IP for `/ask` plus 30/minute and 500/day for all clients together (`RATE_LIMIT_ASK_GLOBAL`, the ceiling on Ask spend), and the login limits above. IPv6 clients are keyed by /64. At most 8 Ask answers stream at once (D-040). Tests in `tests/test_api.py` and `tests/test_admin.py`.
 
 ## Untrusted content
 
 - Source content is untrusted. Ingestion strips scripts and markup (`html_to_text`) and never executes embedded content.
-- SSRF (`app/ingest/common.py:Http`): only `http(s)` URLs, and every redirect hop's resolved address must be public (no loopback, private, link-local, multicast). Redirects are bounded, plus size caps and timeouts. Tests in `tests/test_ingest_common.py`.
+- SSRF (`app/ingest/common.py:Http`): only `http(s)` URLs, and every redirect hop's resolved address must be public (no loopback, private, link-local, multicast, NAT64). The connection goes to the checked address, so DNS rebinding can't swap it (D-040). Each request has a 60 s deadline, and `Authorization` is never sent to another host on redirect. Redirects are bounded, plus size caps and timeouts. Tests in `tests/test_ingest_common.py`.
 - Paywalls and robots.txt are respected (D-016). Full text is stored only where the source allows it, and it is never returned by the API or exported.
 - LLM output is untrusted. Ask NewsDC citations are built from retrieved item IDs and DB URLs, and unknown `[n]` are removed (§11.8). Retrieved text is fenced as evidence, never instructions.
 - API search snippets are HTML-escaped, with only `<mark>` added. The Markdown export escapes every markup character and links only `http(s)` URLs.
-- Frontend (Phase 9): model Markdown (answers, trend brief) goes through `react-markdown` with `skipHtml`, images dropped and only `http(s)` links (`frontend/src/components/Markdown.tsx`). Summaries and titles are plain React text. Every external `href` passes `safeUrl` (`http`/`https` only) and opens with `rel="noopener noreferrer"`. Search snippets are split on `<mark>` and decoded as text, never set with `innerHTML`. The admin CSRF token lives only in memory (TanStack Query cache), never in `localStorage`. The E2E test checks that an escaped snippet renders as text.
+- Frontend (Phase 9): model Markdown (answers, trend brief) goes through `react-markdown` with `skipHtml`, images dropped, and no links except `[n]` citations: a link the model writes is shown as text (`frontend/src/components/Markdown.tsx`). Summaries and titles are plain React text. Every external `href` passes `safeUrl` (`http`/`https` only) and opens with `rel="noopener noreferrer"`. Search snippets are split on `<mark>` and decoded as text, never set with `innerHTML`. The admin CSRF token lives only in memory (TanStack Query cache), never in `localStorage`. The E2E test checks that an escaped snippet renders as text.
 
 ## Headers, CORS, CSP
 
-- Every response: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `X-Request-ID`. API responses: `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`. The Swagger page is left without CSP rather than given a policy that breaks it.
+- Every response: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `X-Request-ID`. API responses: `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`. The Swagger page is left without CSP rather than given a policy that breaks it, and it is turned off in production (`API_DOCS=false`), where it would load a CDN script on the admin's origin.
 - CORS: only `CORS_ORIGINS`, with credentials (admin cookie), methods `GET`/`POST`/`PATCH`, headers `Content-Type`, `X-Request-ID`, `X-CSRF-Token`. In production the frontend and API share one origin behind Caddy, so `CORS_ORIGINS` is the site itself.
 - Frontend CSP set by Caddy (D-037): `default-src 'self'`, `script-src 'self'`, `style-src 'self' 'unsafe-inline'`, `connect-src 'self'`, `frame-ancestors 'none'`, plus HSTS. Checking it against the live app in a browser is pending DNS.
 
@@ -68,3 +68,13 @@ The human should rotate the Anthropic key that was pasted into a chat during Pha
 - Containers run as non-root: backend uid 10001 (`backend/Dockerfile`), frontend dev image as `node` (`frontend/Dockerfile`). Not built on the agent machine because Docker isn't available (R-001).
 - The dev database port is bound to `127.0.0.1` only. The production database has no published port; only Caddy publishes 80/443 (`ufw` allows SSH, 80, 443).
 - Encrypted database backups (`0600`, restore tested, docs/DEPLOYMENT.md); `pip-audit` and `pnpm audit` in CI (no container image scanner, D-037); uvicorn trusts proxy headers only from the compose network, so rate limits see client IPs. Secret rotation: docs/DEPLOYMENT.md.
+
+## Audit 2026-11-10
+
+Triage of `security-audit/` (audited `8b4c0f0`) after checking each finding against the code. Fixes are in D-040.
+
+| Outcome | Findings |
+|---|---|
+| Fixed in code | NDC-01 global Ask limit · NDC-02 pinned connections · NDC-05 stream cap · NDC-06 IPv6 /64 · NDC-07 model links as text · NDC-08 sessions end on restart · NDC-13 fetch deadline · NDC-15 docs off in prod · NDC-16 control characters · NDC-17 token on redirect · NDC-19 NAT64 · NDC-22 restore passphrase · NDC-10 `cap_drop` (partly) · NDC-24 Caddy/Nginx bump and pull on deploy (partly) |
+| Human action, no code | NDC-04 rotate the Anthropic key · NDC-01 set a spend limit in the Anthropic console · NDC-12 branch protection and environment reviewers · NDC-20 confirm `PasswordAuthentication no` |
+| Accepted or overstated | NDC-03: prompt injection can't be fixed in code. Spam is already rejected by `gate()`, so the audit's "drop summaries of spam" is already done; an adversarial eval needs paid calls. NDC-14: an HN poster already chooses their own link and title, so a redirect adds only the merge of a later duplicate. NDC-18: the global login cap is the brute-force defence, and exempting correct tokens would remove it; the CLI on the server still works. NDC-21: logged, and the per-run item cap still applies. NDC-23: dev-only, not in the bundle. NDC-09 (database superuser), NDC-11 (SHA pinning) and the CI Trivy gate are worth doing but need a server migration or a policy decision. |

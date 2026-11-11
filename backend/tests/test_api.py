@@ -6,11 +6,13 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
+from starlette.requests import Request
 
 from app.api import common
 from app.api.search import render_snippet, rrf
-from app.main import MAX_BODY_BYTES, app
-from app.security import reset_rate_limits
+from app.config import get_settings
+from app.main import MAX_BODY_BYTES, app, create_app
+from app.security import client_key, reset_rate_limits
 
 client = TestClient(app, raise_server_exceptions=False)
 
@@ -94,6 +96,22 @@ def test_security_headers_and_csp():
     docs = client.get("/api/v1/docs")
     assert docs.status_code == 200
     assert "content-security-policy" not in docs.headers
+
+
+def test_docs_can_be_turned_off(monkeypatch):
+    monkeypatch.setattr(get_settings(), "api_docs", False)
+    off = TestClient(create_app())
+    assert off.get("/api/v1/docs").status_code == 404
+    assert off.get("/api/v1/openapi.json").status_code == 404
+
+
+def test_ipv6_clients_share_one_limit_per_64():
+    def key(host: str) -> str:
+        return client_key(Request({"type": "http", "client": (host, 1)}))
+
+    assert key("2001:db8:0:1::1") == key("2001:db8:0:1:ffff::2") == "2001:db8:0:1::/64"
+    assert key("2001:db8:0:2::1") != key("2001:db8:0:1::1")
+    assert key("203.0.113.9") == "203.0.113.9"
 
 
 def test_cors_allows_only_configured_origins():

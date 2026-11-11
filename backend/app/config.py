@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     assistant_input_usd_per_mtok: float = 0.0
     assistant_output_usd_per_mtok: float = 0.0
     rate_limit_ask: str = "10/minute"  # per client IP, on top of RATE_LIMIT_DEFAULT
+    # All clients together: the ceiling on Ask spend, whatever the number of IPs (`;` separates).
+    rate_limit_ask_global: str = "30/minute;500/day"
+    # Swagger UI + openapi.json. Off in production: the page loads a CDN script on the admin's
+    # origin.
+    api_docs: bool = True
     job_lease_seconds: int = 600
     github_token: str = ""
     log_level: str = "INFO"

@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 
+import httpcore
 import httpx
 import pytest
 import respx
@@ -51,6 +52,7 @@ def sleeps() -> Sleeps:
         ("http://v6.example/x", "::1"),
         ("http://mapped.example/x", "::ffff:127.0.0.1"),
         ("http://cgnat.example/x", "100.64.0.1"),
+        ("http://nat64.example/x", "64:ff9b::7f00:1"),
     ],
 )
 def test_private_addresses_are_rejected(monkeypatch, url, addr):
@@ -108,6 +110,45 @@ def test_not_modified_is_returned_not_followed(sleeps):
     respx.get("https://example.com/feed").respond(304)
     with Http(sleep=sleeps) as http:
         assert http.get("https://example.com/feed").status == 304
+
+
+def test_connections_are_pinned_to_checked_addresses(monkeypatch, sleeps):
+    connected: list[str] = []
+
+    def connect(self, host, port, *args, **kwargs):
+        connected.append(host)
+        raise httpcore.ConnectError("refused")
+
+    monkeypatch.setattr(httpcore.SyncBackend, "connect_tcp", connect)
+    with Http(sleep=sleeps, attempts=1) as http, pytest.raises(httpx.ConnectError):
+        http.get("https://example.com/")
+    assert connected == ["93.184.216.34"]  # the checked address, not the hostname again
+    # DNS rebinding: public for the guard, loopback by the time the connection is made
+    answers = iter([["93.184.216.34"], ["127.0.0.1"]])
+    monkeypatch.setattr(common, "_resolve", lambda host, port: next(answers))
+    with Http(sleep=sleeps, attempts=1) as http, pytest.raises(UnsafeURLError):
+        http.get("http://rebind.example/")
+    assert connected == ["93.184.216.34"]
+
+
+@respx.mock
+def test_authorization_is_not_sent_to_another_host(sleeps):
+    respx.get("https://api.example.com/a").respond(
+        302, headers={"Location": "https://other.example/b"}
+    )
+    hop2 = respx.get("https://other.example/b").respond(200)
+    with Http(sleep=sleeps) as http:
+        http.get("https://api.example.com/a", headers={"Authorization": "Bearer t", "Accept": "x"})
+    sent = hop2.calls.last.request.headers
+    assert "authorization" not in sent and sent["accept"] == "x"
+
+
+@respx.mock
+def test_slow_responses_hit_the_deadline(monkeypatch, sleeps):
+    monkeypatch.setattr(common, "FETCH_DEADLINE", -1.0)
+    respx.get("https://example.com/slow").respond(200, content=b"x")
+    with Http(sleep=sleeps) as http, pytest.raises(PermanentFetchError, match="slower"):
+        http.get("https://example.com/slow")
 
 
 # --- limits and retries ---------------------------------------------------------------------
@@ -251,7 +292,14 @@ def test_raw_item_normalizes_and_validates():
 
 
 @pytest.mark.parametrize(
-    "bad", [{"url": "javascript:alert(1)"}, {"url": "/relative"}, {"title": ""}, {"points": -1}]
+    "bad",
+    [
+        {"url": "javascript:alert(1)"},
+        {"url": "/relative"},
+        {"url": "https://example.com/a\n\n[Click](https://evil.example)"},
+        {"title": ""},
+        {"points": -1},
+    ],
 )
 def test_raw_item_rejects_bad_rows(bad):
     with pytest.raises(ValidationError):
