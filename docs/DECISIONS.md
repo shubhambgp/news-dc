@@ -295,6 +295,22 @@ Each entry: context, options, decision, why, trade-offs, and whether it changes 
 - **Why:** smallest working CD for one server. Plain `ssh` instead of a third-party SSH action (supply-chain exposure). Host key pinned through a secret, not `StrictHostKeyChecking=no`.
 - **Trade-offs:** builds happen on the 2 vCPU server (a few minutes, brief restart of backend/worker, a running pipeline stops and the worker resumes the rest). No automatic rollback: redeploy a previous commit with `git revert` + push. `concurrency: deploy` serializes deploys.
 
+## D-039 (2026-11-11): UI redesign, frontend only (branch `feat/ui-redesign`)
+- **Decision:** a visual refresh before Phase 11, done only in `frontend/`. Feeds become a card grid; each card gets a cover made of category artwork instead of a photo (CSS gradient with a hue per category, a faint grid, and the category's lucide icon; `src/lib/category.ts`). The home page adds a hero with live numbers from `/stats`, a weekly-briefing banner when a trend brief exists, a "Top story" card plus a numbered trending strip, and topic chips. Theme tokens have an indigo/violet tint; white text sits only on the darker `bg-brand` gradient.
+- **Why not article photos:** no image field exists (`items` has no `og:image`). Adding one means a migration, ingest changes, a backfill, source-terms review (D-016), and opening the CSP's `img-src`, which is out of scope for a frontend round. Category artwork never breaks and costs no requests.
+- **Grid columns** follow the container (`@container` queries), not the viewport, so the same `CardGrid` works next to the home sidebar, in the article's related list and on full-width pages.
+- **No web font:** the CSP has `font-src 'self'`; system fonts are kept.
+- **Trade-offs:** cards are taller than the old rows, so fewer items show per screen; home TBT went from about 250 to 410 ms on mobile (Lighthouse mobile perf 86 to 90, desktop 98; accessibility 100). Deviation from plan §7 Phase 9 visuals only; no API or data change.
+
+- **2026-11-11, NewsDC 2.0 (phases 0–8 of a frontend-only redesign brief):** the D-039 round was extended into a full redesign of every page, still only under `frontend/`. The plan, design system, phase changelog and QA report are in `frontend/docs/` (`UI_REDESIGN_PLAN.md`, `UI_DESIGN_SYSTEM.md`, `UI_REDESIGN_CHANGELOG.md`, `RESPONSIVE_QA_REPORT.md`). Choices:
+  - the brief's palette, with darker light-mode text where the brief failed AA
+  - Inter self-hosted (`@fontsource-variable/inter` 5.3.0, CSP `font-src 'self'`)
+  - a CSS-only tooltip instead of Radix (17.6 kB gzip)
+  - `public/theme-init.js` against the theme flash
+  - a grid shell with a tablet rail and a 2240 px cap
+  - For You on home limited to "Load more", so the sections after it are reachable
+  - frontend alternatives where data is missing: no images, logos, reading time, daily brief or per-topic trend (plan §2)
+
 ## D-040 (2026-11-11): Security audit fixes
 - **Ask spend is capped by a count, not a dollar budget.** `RATE_LIMIT_ASK_GLOBAL` (default `30/minute;500/day`, all clients together) uses the same in-process limiter as every other limit. A count needs no prices (they default to 0), and it is taken before the model call, so a client that disconnects mid-answer is still counted. At the audit's worst case of about $0.12 per answer, the default allows about $60 a day. The trade-off is that a flood can use up Ask for everyone until the window moves on, which is better than an open-ended bill. The counter resets when the backend restarts (R-017).
 - **8 concurrent Ask streams.** A `BoundedSemaphore` is taken inside the SSE generator, not in the route, so a response that never starts streaming can't leak a slot. When it is full, the stream is `sources`, then `error` with code `busy` (HTTP 200, because the stream has already started).
