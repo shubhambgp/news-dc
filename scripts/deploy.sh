@@ -7,7 +7,11 @@ main() {
   cd "$(dirname "$0")/.."
   git pull --ff-only
   local dc="docker compose -f docker-compose.prod.yml"
-  $dc up -d --build --remove-orphans
+  # Tags (caddy:2.11-alpine, python:3.12-slim, ...) get security rebuilds under the same name;
+  # without a pull, Docker keeps using the copy it cached on the first deploy.
+  $dc pull db caddy
+  $dc build --pull
+  $dc up -d --remove-orphans
   for _ in $(seq 1 36); do  # up to 3 minutes for migrations + startup
     [ "$($dc ps backend --format '{{.Health}}')" = healthy ] && break
     sleep 5

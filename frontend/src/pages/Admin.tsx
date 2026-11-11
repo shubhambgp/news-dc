@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { LogOut, Pencil } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Database, FileText, Layers, ListChecks, LogOut, Pencil, Play, RefreshCw, ShieldCheck, Sparkles, Workflow } from 'lucide-react'
 import { useState, type FormEvent, type ReactNode } from 'react'
 
-import { ErrorState, ListSkeleton, PageHeader } from '@/components/common'
+import { ErrorState, ListSkeleton, PageHeader, StatTile, StatusBadge } from '@/components/common'
+import { Badge } from '@/components/ui/badge'
+import { Input, Select, Textarea } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
   ApiError,
@@ -16,8 +18,7 @@ import {
   type Run,
 } from '@/lib/api'
 import { fmtUsd, safeUrl, timeAgo, useTitle } from '@/lib/format'
-
-const inputCls = 'h-9 w-full rounded-md border bg-background px-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+import { cn } from '@/lib/utils'
 
 function Login({ onLogin }: { onLogin: (s: AdminSession) => void }) {
   const [token, setToken] = useState('')
@@ -27,14 +28,20 @@ function Login({ onLogin }: { onLogin: (s: AdminSession) => void }) {
     if (token) login.mutate(token)
   }
   return (
-    <form onSubmit={submit} className="mx-auto max-w-sm space-y-3 rounded-lg border bg-card p-5">
-      <h2 className="font-semibold">Admin login</h2>
-      <label className="block text-sm">
+    <form onSubmit={submit} className="mx-auto mt-6 max-w-sm space-y-4 rounded-2xl border bg-surface p-6 shadow-raised">
+      <span className="grid size-11 place-items-center rounded-xl bg-primary/12 text-primary" aria-hidden>
+        <ShieldCheck className="size-5" />
+      </span>
+      <div>
+        <h2 className="text-lg font-semibold">Admin sign in</h2>
+        <p className="text-sm text-muted-foreground">Use the server's admin token. The session lives in an HTTP-only cookie.</p>
+      </div>
+      <label className="block text-sm font-medium">
         Admin token
-        <input type="password" autoComplete="current-password" value={token} onChange={(e) => setToken(e.target.value)} className={`${inputCls} mt-1`} />
+        <Input type="password" autoComplete="current-password" value={token} onChange={(e) => setToken(e.target.value)} className="mt-1.5" />
       </label>
       {login.isError && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-2.5 text-sm text-destructive-ink">
           {login.error instanceof ApiError && login.error.status === 401
             ? 'Wrong token.'
             : login.error instanceof ApiError && login.error.status === 429
@@ -49,11 +56,13 @@ function Login({ onLogin }: { onLogin: (s: AdminSession) => void }) {
   )
 }
 
-function Section({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
+function Section({ title, icon: Icon, children, action }: { title: string; icon: typeof Database; children: ReactNode; action?: ReactNode }) {
   return (
-    <section className="rounded-lg border bg-card p-4" aria-label={title}>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">{title}</h2>
+    <section className="min-w-0 rounded-2xl border bg-surface p-4 shadow-card sm:p-5" aria-label={title}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 font-semibold">
+          <Icon className="size-4 text-muted-foreground" aria-hidden /> {title}
+        </h2>
         {action}
       </div>
       {children}
@@ -63,18 +72,19 @@ function Section({ title, children, action }: { title: string; children: ReactNo
 
 function Table({ head, children }: { head: string[]; children: ReactNode }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs">
-        <thead className="text-left text-muted-foreground">
+    // Scrolls inside its own box on small screens; the header row stays visible while it scrolls.
+    <div className="relative max-h-[32rem] overflow-auto rounded-xl border">
+      <table className="w-full text-sm">
+        <thead className="sticky top-0 z-10 bg-elevated text-left text-xs text-muted-foreground">
           <tr>
             {head.map((h) => (
-              <th key={h} className="py-1 pr-3 font-normal whitespace-nowrap">
+              <th key={h} className="px-3 py-2 font-medium whitespace-nowrap">
                 {h}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="[&_td]:py-1.5 [&_td]:pr-3 [&_tr]:border-t">{children}</tbody>
+        <tbody className="[&_td]:px-3 [&_td]:py-2 [&_td]:align-middle [&_tr]:border-t [&_tr:hover]:bg-elevated/50">{children}</tbody>
       </table>
     </div>
   )
@@ -101,15 +111,15 @@ function CategoryRow({ c, save }: { c: AdminCategory; save: (slug: string, body:
           >
             <label className="text-xs">
               Name
-              <input className={inputCls} value={form.name} maxLength={80} required onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <Input className="mt-1" value={form.name} maxLength={80} required onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </label>
             <label className="text-xs">
               Keywords (comma separated)
-              <input className={inputCls} value={form.keywords} onChange={(e) => setForm({ ...form, keywords: e.target.value })} />
+              <Input className="mt-1" value={form.keywords} onChange={(e) => setForm({ ...form, keywords: e.target.value })} />
             </label>
             <label className="text-xs sm:col-span-2">
               Description
-              <textarea className={`${inputCls} h-16 py-1`} value={form.description} maxLength={500} required onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              <Textarea className="mt-1" value={form.description} maxLength={500} required onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </label>
             <div className="flex gap-2">
               <Button size="sm" type="submit">Save</Button>
@@ -125,10 +135,10 @@ function CategoryRow({ c, save }: { c: AdminCategory; save: (slug: string, body:
       <td className="font-medium">{c.name}{c.admin_edited_at && <span className="ml-1 text-muted-foreground">(edited)</span>}</td>
       <td className="max-w-xs truncate text-muted-foreground" title={c.description}>{c.description}</td>
       <td>
-        <label className="inline-flex items-center gap-1">
-          <input type="checkbox" checked={c.enabled} onChange={(e) => save(c.slug, { enabled: e.target.checked })} />
+        <label className="inline-flex cursor-pointer items-center gap-2">
+          <input type="checkbox" className="size-4 accent-[var(--primary)]" checked={c.enabled} onChange={(e) => save(c.slug, { enabled: e.target.checked })} />
           <span className="sr-only">Enabled: {c.name}</span>
-          {c.enabled ? 'on' : 'off'}
+          <Badge variant={c.enabled ? 'success' : 'neutral'}>{c.enabled ? 'on' : 'off'}</Badge>
         </label>
       </td>
       <td>
@@ -140,17 +150,36 @@ function CategoryRow({ c, save }: { c: AdminCategory; save: (slug: string, body:
   )
 }
 
+/** Source state as a dot plus words (never colour alone). */
+function SourceHealth({ s }: { s: AdminSource }) {
+  const [label, dot] = !s.enabled
+    ? ['Disabled in config', 'bg-muted-foreground']
+    : s.admin_disabled
+      ? ['Paused', 'bg-warning']
+      : s.last_error
+        ? ['Active · last fetch failed', 'bg-destructive']
+        : ['Active', 'bg-success']
+  return (
+    <span className="inline-flex items-center gap-2 text-sm">
+      <span className={cn('size-2 rounded-full', dot)} aria-hidden />
+      {label}
+    </span>
+  )
+}
+
 function Dashboard({ session, onLogout }: { session: AdminSession; onLogout: () => void }) {
   const qc = useQueryClient()
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [rejPage, setRejPage] = useState(1)
+  const [jobFilter, setJobFilter] = useState('')
+  const [rejStatus, setRejStatus] = useState('')
   const sources = useQuery({ queryKey: ['admin', 'sources'], queryFn: () => admin.get<AdminSource[]>('/sources') })
   const categories = useQuery({ queryKey: ['admin', 'categories'], queryFn: () => admin.get<AdminCategory[]>('/categories') })
   const jobs = useQuery({ queryKey: ['admin', 'jobs'], queryFn: () => admin.get<AdminJob[]>('/jobs'), refetchInterval: 10_000 })
   const runs = useQuery({ queryKey: ['admin', 'runs'], queryFn: () => admin.get<Run[]>('/runs') })
   const rejected = useQuery({
-    queryKey: ['admin', 'rejected', rejPage],
-    queryFn: () => admin.get<Page<RejectedItem>>(`/rejected?page=${rejPage}&page_size=20`),
+    queryKey: ['admin', 'rejected', rejPage, rejStatus],
+    queryFn: () => admin.get<Page<RejectedItem>>(`/rejected?page=${rejPage}&page_size=20${rejStatus ? `&status=${rejStatus}` : ''}`),
   })
 
   const act = useMutation({
@@ -179,31 +208,56 @@ function Dashboard({ session, onLogout }: { session: AdminSession; onLogout: () 
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" disabled={act.isPending} onClick={() => run('Ingest all sources', '/ingest', {})}>Ingest all sources</Button>
-        <Button size="sm" variant="outline" disabled={act.isPending} onClick={() => run('Run pipeline', '/pipeline')}>Run pipeline</Button>
-        <Button size="sm" variant="outline" disabled={act.isPending} onClick={() => run('Regenerate trend brief', '/trend-brief')}>Regenerate trend brief</Button>
-        <Button size="sm" variant="outline" disabled={act.isPending} onClick={() => run('Reprocess outdated', '/reprocess-outdated')}>Reprocess outdated</Button>
-        <Button size="sm" variant="ghost" className="ml-auto" onClick={logout}>
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatTile icon={Database} label="Active sources" value={sources.data ? `${sources.data.filter((x) => x.active).length}/${sources.data.length}` : '…'} sub={sources.data ? `${sources.data.filter((x) => x.last_error).length} with a fetch error` : undefined} tone="data" />
+        <StatTile icon={Workflow} label="Jobs queued or running" value={jobs.data ? jobs.data.filter((j) => ['pending', 'running', 'retry_wait'].includes(j.status)).length : '…'} sub="Refreshes every 10 s" />
+        <StatTile icon={AlertTriangle} label="Dead letters" value={jobs.data ? jobs.data.filter((j) => j.status === 'dead_letter').length : '…'} sub="Jobs that ran out of retries" tone="ai" />
+        <StatTile icon={ListChecks} label="Kept out of the feed" value={rejected.data && !rejStatus ? rejected.data.total.toLocaleString() : '…'} sub="Rejected by prefilter or AI, or duplicates" tone="success" />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-surface p-3 shadow-card">
+        <Button size="sm" disabled={act.isPending} onClick={() => run('Ingest all sources', '/ingest', {})}>
+          <Play /> Ingest all sources
+        </Button>
+        <Button size="sm" variant="outline" disabled={act.isPending} onClick={() => run('Run pipeline', '/pipeline')}>
+          <Sparkles /> Run pipeline <Badge variant="warning">paid</Badge>
+        </Button>
+        <Button size="sm" variant="outline" disabled={act.isPending} onClick={() => run('Regenerate trend brief', '/trend-brief')}>
+          <FileText /> Regenerate trend brief <Badge variant="warning">paid</Badge>
+        </Button>
+        <Button size="sm" variant="outline" disabled={act.isPending} onClick={() => run('Reprocess outdated', '/reprocess-outdated')}>
+          <RefreshCw /> Reprocess outdated <Badge variant="warning">paid</Badge>
+        </Button>
+        <span className="text-xs text-muted-foreground max-lg:basis-full lg:ml-auto">Session expires {timeAgo(session.expires_at)} · actions queue jobs for the worker</span>
+        <Button size="sm" variant="ghost" onClick={logout}>
           <LogOut /> Log out
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground">Session expires {timeAgo(session.expires_at)}. Actions queue jobs for the worker.</p>
       {msg && (
-        <p role="status" className={`rounded-md border p-2 text-sm ${msg.ok ? '' : 'border-destructive text-destructive'}`}>
+        <p
+          role="status"
+          className={cn('flex items-start gap-2 rounded-xl border p-3 text-sm', msg.ok ? 'border-success/40 bg-success/10 text-success-ink' : 'border-destructive/40 bg-destructive/10 text-destructive-ink')}
+        >
+          {msg.ok ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden /> : <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />}
           {msg.text}
         </p>
       )}
 
-      <Section title="Sources">
+      <Section title="Sources" icon={Database}>
         {sources.isPending ? <ListSkeleton rows={3} /> : sources.isError ? <ErrorState error={sources.error} retry={() => sources.refetch()} /> : (
           <Table head={['Source', 'State', 'Last fetch', 'Last status', '']}>
             {sources.data.map((s) => (
               <tr key={s.key}>
-                <td><span className="font-medium">{s.name}</span> <span className="text-muted-foreground">({s.key})</span></td>
-                <td>{!s.enabled ? 'disabled in config' : s.admin_disabled ? 'paused' : 'active'}</td>
-                <td>{timeAgo(s.last_fetched_at)}</td>
-                <td className={s.last_error ? 'text-destructive' : undefined} title={s.last_error ?? undefined}>{s.last_status ?? '–'}</td>
+                <td>
+                  <span className="font-medium">{s.name}</span> <span className="text-xs text-muted-foreground">({s.key})</span>
+                </td>
+                <td className="whitespace-nowrap">
+                  <SourceHealth s={s} />
+                </td>
+                <td className="whitespace-nowrap text-muted-foreground">{timeAgo(s.last_fetched_at)}</td>
+                <td className={cn('max-w-xs truncate', s.last_error && 'text-destructive-ink')} title={s.last_error ?? undefined}>
+                  {s.last_status ?? '–'}
+                </td>
                 <td className="whitespace-nowrap">
                   {s.enabled && (
                     <>
@@ -220,7 +274,7 @@ function Dashboard({ session, onLogout }: { session: AdminSession; onLogout: () 
         )}
       </Section>
 
-      <Section title="Categories">
+      <Section title="Categories" icon={Layers}>
         {categories.isPending ? <ListSkeleton rows={3} /> : categories.isError ? <ErrorState error={categories.error} retry={() => categories.refetch()} /> : (
           <Table head={['Name', 'Description', 'Enabled', '']}>
             {categories.data.map((c) => (
@@ -230,14 +284,29 @@ function Dashboard({ session, onLogout }: { session: AdminSession; onLogout: () 
         )}
       </Section>
 
-      <Section title="Jobs">
+      <Section
+        title="Jobs"
+        icon={Workflow}
+        action={
+          <Select aria-label="Job status" className="w-auto" value={jobFilter} onChange={(e) => setJobFilter(e.target.value)}>
+            <option value="">All statuses</option>
+            {['pending', 'running', 'retry_wait', 'succeeded', 'dead_letter', 'cancelled'].map((x) => (
+              <option key={x} value={x}>
+                {x.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </Select>
+        }
+      >
         {jobs.isPending ? <ListSkeleton rows={3} /> : jobs.isError ? <ErrorState error={jobs.error} retry={() => jobs.refetch()} /> : (
           <Table head={['#', 'Kind', 'Status', 'Attempts', 'Created', 'Last error', '']}>
-            {jobs.data.map((j) => (
+            {jobs.data.filter((j) => !jobFilter || j.status === jobFilter).map((j) => (
               <tr key={j.id}>
                 <td>{j.id}</td>
                 <td>{j.kind}{typeof j.payload.source === 'string' && ` · ${j.payload.source}`}</td>
-                <td className={j.status === 'dead_letter' ? 'text-destructive' : undefined}>{j.status}</td>
+                <td>
+                  <StatusBadge status={j.status} />
+                </td>
                 <td className="tabular-nums">{j.attempt_count}/{j.max_attempts}</td>
                 <td>{timeAgo(j.created_at)}</td>
                 <td className="max-w-xs truncate" title={j.last_error ?? undefined}>{j.last_error ?? ''}</td>
@@ -248,7 +317,7 @@ function Dashboard({ session, onLogout }: { session: AdminSession; onLogout: () 
         )}
       </Section>
 
-      <Section title="Runs">
+      <Section title="Runs" icon={Play}>
         {runs.isPending ? <ListSkeleton rows={3} /> : runs.isError ? <ErrorState error={runs.error} retry={() => runs.refetch()} /> : (
           <Table head={['#', 'Kind', 'Started', 'Status', 'Fetched', 'New', 'Published', 'Rejected', 'Cost', 'Note']}>
             {runs.data.slice(0, 20).map((r) => (
@@ -256,7 +325,9 @@ function Dashboard({ session, onLogout }: { session: AdminSession; onLogout: () 
                 <td>{r.id}</td>
                 <td>{r.kind}{r.source_key && ` · ${r.source_key}`} <span className="text-muted-foreground">({r.trigger})</span></td>
                 <td>{timeAgo(r.started_at)}</td>
-                <td className={r.status === 'failed' ? 'text-destructive' : undefined}>{r.status}</td>
+                <td>
+                  <StatusBadge status={r.status} />
+                </td>
                 <td className="tabular-nums">{r.fetched}</td>
                 <td className="tabular-nums">{r.new}</td>
                 <td className="tabular-nums">{r.processed}</td>
@@ -271,8 +342,23 @@ function Dashboard({ session, onLogout }: { session: AdminSession; onLogout: () 
 
       <Section
         title={`Kept out of the feed${rejected.data ? ` (${rejected.data.total})` : ''}`}
+        icon={ListChecks}
         action={
-          <div className="flex gap-1">
+          <div className="flex flex-wrap items-center gap-1">
+            <Select
+              aria-label="Reason"
+              className="w-auto"
+              value={rejStatus}
+              onChange={(e) => {
+                setRejStatus(e.target.value)
+                setRejPage(1)
+              }}
+            >
+              <option value="">All reasons</option>
+              <option value="rejected_prefilter">Rejected (prefilter)</option>
+              <option value="rejected_ai">Rejected (AI)</option>
+              <option value="duplicate">Duplicate</option>
+            </Select>
             <Button size="sm" variant="ghost" disabled={rejPage === 1} onClick={() => setRejPage((p) => p - 1)}>Previous</Button>
             <Button size="sm" variant="ghost" disabled={!rejected.data?.has_more} onClick={() => setRejPage((p) => p + 1)}>Next</Button>
           </div>
@@ -285,7 +371,9 @@ function Dashboard({ session, onLogout }: { session: AdminSession; onLogout: () 
                 <td className="max-w-sm">
                   <a href={safeUrl(r.url)} target="_blank" rel="noopener noreferrer" className="line-clamp-1 hover:underline">{r.title}</a>
                 </td>
-                <td className="whitespace-nowrap">{r.status}</td>
+                <td className="whitespace-nowrap">
+                  <Badge variant={r.status === 'duplicate' ? 'neutral' : 'warning'}>{r.status.replace(/_/g, ' ')}</Badge>
+                </td>
                 <td className="max-w-xs truncate" title={r.reason ?? undefined}>{r.reason ?? ''}</td>
                 <td className="tabular-nums">{r.relevance_score ?? '–'}</td>
                 <td className="tabular-nums">{r.quality_score ?? '–'}</td>
@@ -318,7 +406,7 @@ export default function AdminPage() {
 
   return (
     <>
-      <PageHeader title="Admin" />
+      <PageHeader title="Admin" icon={ShieldCheck} description="Sources, categories, jobs, runs and the items the pipeline kept out of the feed." />
       {body}
     </>
   )

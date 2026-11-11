@@ -27,6 +27,7 @@ from app.security import (
     RATE_LIMIT_EXEMPT,
     SECURITY_HEADERS,
     allow,
+    client_key,
 )
 from app.seed import seed
 
@@ -136,8 +137,7 @@ async def rate_limit(
 ) -> Response:
     """Default per-IP limit on every route except the health probes. CORS preflights are answered
     by the CORS middleware before they get here."""
-    client = request.client.host if request.client else "unknown"
-    if request.url.path not in RATE_LIMIT_EXEMPT and not allow(client):
+    if request.url.path not in RATE_LIMIT_EXEMPT and not allow(client_key(request)):
         return error_response(request, 429, "rate_limited", f"rate limit exceeded: {DEFAULT_LIMIT}")
     return await call_next(request)
 
@@ -193,8 +193,8 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="NewsDC API",
         version=__version__,
-        docs_url="/api/v1/docs",
-        openapi_url="/api/v1/openapi.json",
+        docs_url="/api/v1/docs" if settings.api_docs else None,
+        openapi_url="/api/v1/openapi.json" if settings.api_docs else None,
         redoc_url=None,
         lifespan=lifespan,
         responses={

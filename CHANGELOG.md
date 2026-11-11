@@ -2,7 +2,43 @@
 
 All notable changes, grouped by build phase. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [1.0.0] - 2026-11-11
+
+### Phase 11: Polish, docs & presentation (2026-11-11)
+
+#### Added
+- `README.md` rewritten: features, screenshots (`docs/img/`), architecture, quick start, environment variable table, tests, deployment, project structure, how AI agents were used, limitations and future work.
+- `docs/ARCHITECTURE.md`: Mermaid diagrams for the system, the ingestion and processing workflow with status transitions, and the Ask NewsDC (RAG) sequence, plus a table of key design decisions and trade-offs.
+- `docs/AI_CONFIG.md`: summary table (prompts with versions, models, cost per 1,000 articles), the classifier output schema, and how to switch LLM providers.
+- `docs/PRESENTATION.md`: Marp deck (15 slides) with a 5-minute demo script in the speaker notes.
+- Frontend test `src/components/Markdown.test.tsx`; Vitest now also runs `.tsx` tests.
+
+#### Fixed (code review of the security audit fixes, D-041)
+- `/ask` answers without evidence (no LLM call) no longer count against the global Ask budget.
+- Rate-limit keys: an IPv4-mapped IPv6 client (`::ffff:a.b.c.d`) is keyed by its IPv4 address instead of sharing one /64 with every IPv4 client.
+- Fetcher: `trust_env=False`, so a `HTTP(S)_PROXY` in the environment can't bypass connection pinning. `Authorization` is also dropped on an https → http redirect to the same host.
+- Test: the disconnect test checks that the stream slot is released.
+
+#### Changed
+- Version 1.0.0 (`backend/pyproject.toml`, `app.__version__`, `frontend/package.json`).
+
+### Fix: concurrent ingest deadlock (2026-11-11)
+- Two runs of the same source writing one page could deadlock on the unique indexes of `items` and `item_sources`, failing a run (seen in CI run 42956055213). Page writes of one source are now serialized with a transaction-level advisory lock, taken after enrichment, so no network I/O happens under it. `test_concurrent_runs_do_not_duplicate` now starts 8 runs instead of 3.
+
+### Security audit fixes (2026-11-11)
+
+Fixes for the audit in `security-audit/` (audited `8b4c0f0`). Decisions in D-040, triage in `docs/SECURITY.md#audit-2026-11-10`.
+
+#### Security
+- `/ask` has a limit for all clients together (`RATE_LIMIT_ASK_GLOBAL`, default `30/minute;500/day`), so the Anthropic spend has a ceiling however many IPs send requests (NDC-01).
+- At most 8 Ask answers stream at once. Past that, the stream ends with an `error` event, code `busy`, and no LLM call is made, which keeps worker threads free for the rest of the API (NDC-05).
+- The fetcher connects only to the address it has just checked, which closes the DNS-rebinding window (NDC-02). NAT64 addresses are refused (NDC-19). Each request must finish within 60 s (NDC-13). `Authorization` is dropped when a redirect goes to another host (NDC-17).
+- URLs containing control characters are rejected at ingestion, and the Markdown export percent-encodes them (NDC-16).
+- Rate limits key IPv6 clients by /64 (NDC-06). Admin sessions end when the backend restarts, so a logout can't be undone by a restart (NDC-08).
+- Links written by the model (Ask answers, trend brief) render as plain text. Only `[n]` citations stay links (NDC-07).
+- `API_DOCS=false` in production turns off Swagger UI and `openapi.json` (NDC-15).
+- Production: `cap_drop: [ALL]` on backend, worker and frontend (NDC-10). Caddy is 2.11 and Nginx 1.30. `deploy.sh` pulls `db`/`caddy` and rebuilds with `--pull`, so security rebuilds of the same tags reach the server (NDC-24).
+- The restore command reads the backup passphrase from a file descriptor, not the command line (NDC-22).
 
 ### Phase 10: Production Docker & deployment (2026-11-10)
 

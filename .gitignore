@@ -27,3 +27,7 @@ data/*.db
 .claude
 # Server backups
 backups/
+
+# Local scratch / not for commit
+temp/
+frontend/.pnpm-store/

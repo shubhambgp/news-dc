@@ -2,6 +2,18 @@
 
 Who did what, per phase. "Agent + Human verified" is used only after the human has actually confirmed the item.
 
+## Summary by kind of AI use
+
+| Kind | What the AI did | Where to check | Verified by the human? |
+|---|---|---|---|
+| AI-assisted development | Claude Code (Claude Opus 5.5) wrote the code, migrations and config for every phase from `plan.md` | Git history, phase sections below | Phase reviews pending (see PHASE_STATUS) |
+| Agent-based ingestion and classification | The agent ran the backfills, and the LangGraph pipeline classifies every item with `CLASSIFIER_MODEL` | VERIFICATION_LOG Phases 2–3, `/stats` | Spot check by the agent; **human spot check pending** |
+| Automated summarization | The classifier writes the summary and insights; Ask NewsDC and the weekly trend brief write cited answers | AI_CONFIG, VERIFICATION_LOG Phases 6–7 | **Pending**: judge the Q&A pairs and the brief |
+| AI code review | A security audit (`security-audit/`, 24 findings) and a review pass of the fixes (Phase 11: 6 low findings, all fixed) | SECURITY.md, D-040, D-041, CHANGELOG 1.0.0 | **Pending** |
+| Test generation | The agent wrote all tests: 388 backend (pytest), 12 Vitest, 1 Playwright E2E. The LLM is mocked | `backend/tests/`, `frontend/src/**/*.test.*`, `frontend/e2e/` | CI runs them; content review pending |
+| Documentation | The agent wrote every doc, the CHANGELOG and the logs | `docs/`, README | **Pending** human review |
+| Human-only work | Plan, phase approvals, domain and DNS, API keys and credentials, deciding on open questions | n/a | Done by the human |
+
 ## Phase 0: Project skeleton & dev environment
 
 Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
@@ -189,3 +201,34 @@ Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
 | `docs/DEPLOYMENT.md`, D-037, logs, status | Agent | Pending human review |
 | DNS A record for `news-dc.atinus.co` | Human | Done by the human; resolves to the VPS |
 | Open the site over HTTPS, log in to Admin | Human | **Pending human verification** |
+
+## Security audit fixes (2026-11-11)
+
+| Task | Done by | How verified |
+|---|---|---|
+| Triage the 24 findings in `security-audit/` against the code (SECURITY.md#audit-2026-11-10) | Agent | Code read per finding |
+| Ask: all-clients limit, 8-stream cap | Agent | pytest (new tests) |
+| Fetcher: pinned connections, NAT64, 60 s deadline, no cross-host `Authorization`, control characters in URLs | Agent | pytest (new tests) |
+| IPv6 /64 rate-limit key, sessions end on restart, docs off in prod, model links as text | Agent | pytest, frontend checks |
+| `cap_drop`, Caddy 2.11, Nginx 1.30, pull on deploy, restore passphrase via fd | Agent | Local Docker run (VERIFICATION_LOG) |
+| Rotate the Anthropic key, set a spend limit, branch protection, check sshd | Human | **Pending human verification** |
+| Deploy and check the live site | Human | **Pending human verification** |
+
+## Phase 11: Polish, docs & presentation
+
+Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-11.
+
+| Task | Done by | How verified |
+|---|---|---|
+| Re-read Phase 11, §8, §13, §16, §17; inspected the existing docs and the live `/stats` | Agent | n/a |
+| Review pass of the security-fix commit `d89ad2b` | Agent (a review subagent; the main agent checked each finding against the code) | 1 finding traced in a scratch script (stream slot released on disconnect: no defect); 6 low findings reported |
+| Fix the 6 findings: global Ask budget only for answers that call the LLM, IPv4-mapped rate-limit key, `trust_env=False`, no `Authorization` over http, slot-release assertion, Markdown link test | Agent | A regression test for each; full pytest 388 passed; Vitest 12 passed |
+| README (features, screenshots, env table, structure, agent usage, limitations) | Agent | Claims checked against `config/sources.yaml`, `.env.example` and live `/stats`. Pending human review |
+| ARCHITECTURE Mermaid diagrams + trade-offs; AI_CONFIG summary, schema, provider switch | Agent | Checked against the code. **Mermaid rendering not checked** (mermaid-cli install not permitted). Pending human verification on GitHub |
+| PRESENTATION.md (Marp, 15 slides, demo script) | Agent | Numbers from live `/stats` and AI_EVALUATION. **Not exported to PDF or rehearsed**: pending human |
+| Screenshots of the live site | Agent | Headless Chrome; looked at by the agent |
+| Final checks: backend, frontend, E2E, local production compose | Agent | VERIFICATION_LOG Phase 11 |
+| Version 1.0.0, CHANGELOG, D-041, logs, status | Agent | Pending human review |
+| Deploy 1.0.0 (merge to `main` → push-to-deploy) and run `scripts/smoke_test.sh` | Human | **Pending human verification** |
+| Rehearse the demo, record the backup video, review the eval labels and the AI summaries | Human | **Pending human verification** |
+

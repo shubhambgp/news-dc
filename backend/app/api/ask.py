@@ -9,6 +9,7 @@ after a dropped connection the client sends the question again.
 
 import json
 import logging
+import threading
 from collections.abc import AsyncIterator, Generator
 from contextlib import suppress
 from datetime import UTC, datetime
@@ -17,7 +18,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
-from limits import parse
+from limits import parse, parse_many
 from sqlalchemy import Text, cast, func
 from sqlalchemy.orm import Session
 from starlette.concurrency import iterate_in_threadpool
@@ -33,7 +34,7 @@ from app.config import get_settings
 from app.models import AIAnnotation, Item
 from app.recommend.scoring import age_hours_sql, ask_rank
 from app.schemas import AskRequest, AskSource, ErrorResponse, SourceRef
-from app.security import allow
+from app.security import allow, client_key
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["ask"])
@@ -41,6 +42,11 @@ router = APIRouter(tags=["ask"])
 RETRIEVE = 25  # hybrid-search candidates
 TOP = 8  # sources given to the model
 ASK_LIMIT = parse(get_settings().rate_limit_ask)
+ASK_GLOBAL_LIMITS = parse_many(get_settings().rate_limit_ask_global)
+# A stream holds a worker thread for the whole answer; Starlette has 40 for every route.
+MAX_STREAMS = 8
+_streams = threading.BoundedSemaphore(MAX_STREAMS)
+BUSY = {"code": "busy", "message": "The assistant is busy right now. Try again in a minute."}
 
 SUGGESTED_QUESTIONS = [
     "What are the latest developments in AI data center infrastructure?",
@@ -121,6 +127,19 @@ def answer_events(
         yield sse("token", {"text": assistant.NO_EVIDENCE_ANSWER})
         yield sse("done", {"cited": [], "removed_citations": 0, "truncated": False})
         return
+    # Taken inside the generator, so a response that never starts streaming holds no slot.
+    if not _streams.acquire(blocking=False):
+        yield sse("error", BUSY)
+        return
+    try:
+        yield from _generate(llm, req, evidence, request_id)
+    finally:
+        _streams.release()
+
+
+def _generate(
+    llm: ChatLLM, req: AskRequest, evidence: list[Evidence], request_id: str
+) -> Generator[str, None, None]:
     yield sse("status", {"stage": "generating"})
     settings = get_settings()
     cites = CitationFilter(len(evidence))
@@ -224,11 +243,14 @@ def ask(
     llm: Annotated[ChatLLM, Depends(get_llm)],
 ) -> StreamingResponse:
     """Answers from NewsDC's collected items only, citing them as `[n]`. Rate limited per IP
-    (`RATE_LIMIT_ASK`, default 10/minute) on top of the default limit."""
-    client = request.client.host if request.client else "unknown"
-    if not allow(client, ASK_LIMIT, "ask"):
+    (`RATE_LIMIT_ASK`, default 10/minute) on top of the default limit, and for all clients
+    together (`RATE_LIMIT_ASK_GLOBAL`, default 30/minute and 500/day)."""
+    if not allow(client_key(request), ASK_LIMIT, "ask"):
         raise ApiError(429, "rate_limited", f"rate limit exceeded: {ASK_LIMIT}")
     rows = retrieve(db, embedder, retrieval_query(req), assistant.is_time_sensitive(req.question))
+    # Only answers that will call the LLM use the shared budget; the no-evidence reply is free.
+    if rows and not all(allow("all", limit, "ask_global") for limit in ASK_GLOBAL_LIMITS):
+        raise ApiError(429, "rate_limited", "Ask NewsDC is busy, try again later")
     evidence, sources = [], []
     for n, r in enumerate(rows, start=1):
         item: Item = r[0]
