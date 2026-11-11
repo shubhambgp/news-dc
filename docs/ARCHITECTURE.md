@@ -4,7 +4,7 @@ How NewsDC is put together: the processes, the ingestion and AI workflow, Ask Ne
 
 ## System
 
-An editable version of the system and pipeline diagrams is in [diagrams/newsdc.excalidraw](diagrams/newsdc.excalidraw) (open it at excalidraw.com or with the VS Code Excalidraw extension).
+An editable version of the system and pipeline diagrams is in [diagrams/newsdc.excalidraw](diagrams/newsdc.excalidraw) (open it at excalidraw.com or with the VS Code Excalidraw extension). Rendered PNGs of the three Mermaid diagrams below are in `img/arch-system.png`, `img/arch-pipeline.png` and `img/arch-rag.png` (used by the presentation).
 
 ```mermaid
 flowchart LR
