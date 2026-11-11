@@ -189,3 +189,15 @@ Agent: Claude Code (Claude Opus 5.5). Date: 2026-11-09.
 | `docs/DEPLOYMENT.md`, D-037, logs, status | Agent | Pending human review |
 | DNS A record for `news-dc.atinus.co` | Human | Done by the human; resolves to the VPS |
 | Open the site over HTTPS, log in to Admin | Human | **Pending human verification** |
+
+## Security audit fixes (2026-11-11)
+
+| Task | Done by | How verified |
+|---|---|---|
+| Triage the 24 findings in `security-audit/` against the code (SECURITY.md#audit-2026-11-10) | Agent | Code read per finding |
+| Ask: all-clients limit, 8-stream cap | Agent | pytest (new tests) |
+| Fetcher: pinned connections, NAT64, 60 s deadline, no cross-host `Authorization`, control characters in URLs | Agent | pytest (new tests) |
+| IPv6 /64 rate-limit key, sessions end on restart, docs off in prod, model links as text | Agent | pytest, frontend checks |
+| `cap_drop`, Caddy 2.11, Nginx 1.30, pull on deploy, restore passphrase via fd | Agent | Local Docker run (VERIFICATION_LOG) |
+| Rotate the Anthropic key, set a spend limit, branch protection, check sshd | Human | **Pending human verification** |
+| Deploy and check the live site | Human | **Pending human verification** |

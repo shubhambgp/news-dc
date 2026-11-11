@@ -1,6 +1,6 @@
 # NewsDC API
 
-Base path: `/api/v1`. The interactive OpenAPI docs are at `/api/v1/docs` and the schema is at `/api/v1/openapi.json`. Request and response models live in `backend/app/schemas.py`.
+Base path: `/api/v1`. The interactive OpenAPI docs are at `/api/v1/docs` and the schema is at `/api/v1/openapi.json`. Both are off when `API_DOCS=false`, as in production. Request and response models live in `backend/app/schemas.py`.
 
 Every endpoint is **rate limited** to `RATE_LIMIT_DEFAULT` (60/minute) per client IP, except `/health` and `/ready`. Everything outside `/admin` is **public** and read-only. `POST /ask` has an extra limit, `RATE_LIMIT_ASK` (10/minute). `/admin/*` is **admin-only** (see [Admin](#admin)). Request bodies are at most 64 KiB.
 
@@ -125,7 +125,7 @@ Validation, rate-limit and configuration errors (`503 assistant_unavailable` whe
 | `status` | Before generation starts | `{"stage": "generating"}` |
 | `token` | Many times | `{"text": "…"}`. Markdown text. Citation numbers that don't match a source have already been removed |
 | `done` | Success, last event | `{"cited": [1, 3], "removed_citations": 0, "truncated": false}`. `truncated` means the answer hit `ASSISTANT_MAX_TOKENS` |
-| `error` | Failure, last event | `{"code": "llm_unavailable" \| "llm_error" \| "no_answer", "message": "…"}`. Discard any tokens already shown. `done` never follows an `error` |
+| `error` | Failure, last event | `{"code": "llm_unavailable" \| "llm_error" \| "no_answer" \| "busy", "message": "…"}`. `busy`: too many answers are streaming; try again shortly. Discard any tokens already shown. `done` never follows an `error` |
 
 When nothing matches, the stream is `sources` (empty), one `token` saying the collected sources don't cover the question, then `done`. No LLM call is made. There is no resume and no event IDs: if the connection drops, send the question again. When the client disconnects, the server closes the upstream LLM stream.
 
@@ -206,7 +206,7 @@ Every non-2xx response has the same shape:
 | 413 | `payload_too_large` | A request body over 64 KiB |
 | 405 | `method_not_allowed` | Wrong HTTP method |
 | 422 | `validation_error` | Invalid parameters. The message names the field (up to 3 errors), e.g. `query.page_size: Input should be less than or equal to 50` |
-| 429 | `rate_limited` | Over the per-IP limit |
+| 429 | `rate_limited` | Over the per-IP limit, or the all-clients limit on `/ask` |
 | 500 | `internal_error` | Unexpected error. No internals are exposed. |
 | 503 | `db_unavailable` | The database is unreachable |
 | 503 | `admin_disabled` | Admin route while `ADMIN_TOKEN`/`SESSION_SECRET` are unset |

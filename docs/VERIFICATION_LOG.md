@@ -985,3 +985,26 @@ all checks passed
 - Push needed the `workflow` scope on the human's `gh` token (`refusing to allow an OAuth App to create or update workflow`); the human ran `gh auth refresh -s workflow`.
 - Run 42755588479 (`fb897a2`): `backend: success` (`375 passed`, `pip-audit`: `No known vulnerabilities found`), `frontend: success`, `images: success`, `deploy: success` (`deployed fb897a2`, backend healthy). Live `/api/v1/ready` → `{"status":"ok","db":"ok"}` afterwards.
 - Deploy key: forced command checked by connecting with the key and sending `echo should-not-run; id`; the server ran `deploy.sh` instead.
+
+## Security audit fixes (2026-11-11, branch `fix/security-audit`, D-040)
+
+Run on the agent machine. `uv` isn't on PATH here, so the backend tools ran from `backend/.venv/bin`, which `uv run` uses too.
+
+| Command | Result |
+|---|---|
+| `ruff format . && ruff check --fix .` | `1 file reformatted`; `Found 1 error (1 fixed, 0 remaining)` |
+| `mypy app` | `Success: no issues found in 42 source files` |
+| `pytest -q` (no DB) | `267 passed, 118 skipped in 4.93s` |
+| `TEST_DATABASE_URL=… DATABASE_URL=… pytest -q` (local `newsdc_test` on 5433, created for this run) | `385 passed in 16.66s` |
+| `pnpm lint --deny-warnings && pnpm typecheck && pnpm test && pnpm build` | lint and typecheck clean; `Tests 10 passed (10)`; `✓ built in 740ms` |
+| `docker compose -f docker-compose.prod.yml config -q` (dummy `POSTGRES_PASSWORD`, `DOMAIN=localhost`) | exit 0 |
+| `caddy:2.11-alpine caddy validate` on `Caddyfile` | `Valid configuration` |
+| Backend image with `--cap-drop ALL`, `API_DOCS=false`, `config/` mounted, DB unreachable | `health 200`, `docs 404`, `openapi.json 404` |
+| Frontend image with `--cap-drop ALL` | `/` served (`id="root"` found) |
+| `--security-opt no-new-privileges:true` | `exec /bin/sh: operation not permitted` for `alpine:3` too (snap Docker on this machine), so it was left out |
+
+New tests: pinned connection and rebinding, NAT64, cross-host `Authorization`, fetch deadline, control characters in URLs and in `md_link`, the all-clients Ask limit, the stream cap and slot release, restart ending sessions, IPv6 /64 key, docs turned off.
+
+### Not checked
+- The deploy on the VPS (pull, `cap_drop`, Caddy 2.11 serving TLS). Check `docker compose ps` and the smoke test after the next deploy.
+- An Ask request against the real model.

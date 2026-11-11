@@ -310,3 +310,12 @@ Each entry: context, options, decision, why, trade-offs, and whether it changes 
   - a grid shell with a tablet rail and a 2240 px cap
   - For You on home limited to "Load more", so the sections after it are reachable
   - frontend alternatives where data is missing: no images, logos, reading time, daily brief or per-topic trend (plan §2)
+
+## D-040 (2026-11-11): Security audit fixes
+- **Ask spend is capped by a count, not a dollar budget.** `RATE_LIMIT_ASK_GLOBAL` (default `30/minute;500/day`, all clients together) uses the same in-process limiter as every other limit. A count needs no prices (they default to 0), and it is taken before the model call, so a client that disconnects mid-answer is still counted. At the audit's worst case of about $0.12 per answer, the default allows about $60 a day. The trade-off is that a flood can use up Ask for everyone until the window moves on, which is better than an open-ended bill. The counter resets when the backend restarts (R-017).
+- **8 concurrent Ask streams.** A `BoundedSemaphore` is taken inside the SSE generator, not in the route, so a response that never starts streaming can't leak a slot. When it is full, the stream is `sources`, then `error` with code `busy` (HTTP 200, because the stream has already started).
+- **The fetcher pins the connection.** `_PinnedBackend` (httpcore `SyncBackend`) resolves, checks and connects to the same address, while TLS still verifies the hostname. httpx has no public hook for this, so it is set on `transport._pool._network_backend`. A test fails if an upgrade moves that attribute.
+- **Admin sessions end at restart.** The cookie HMAC key is `SESSION_SECRET` plus a random value generated at boot. The logout list is in memory, so a restart would otherwise bring logged-out cookies back. The cost is a new admin login after each deploy.
+- **API docs are off in production** (`API_DOCS=false` in `docker-compose.prod.yml`). Locally they stay at `/api/v1/docs`.
+- **`no-new-privileges` is not set.** Docker on the agent machine (snap) refuses to start any container with it, `alpine` included, so it couldn't be verified. `cap_drop: [ALL]` was verified: backend health 200, frontend served. Caddy and Postgres keep their default capabilities, because both start as root and need some.
+- **Not changed (see SECURITY.md):** no Trivy gate in CI. It would block deploys on base-image CVEs that have no fix in our control. The audit's other items are either actions in GitHub, Anthropic or the server, or design trade-offs recorded there.

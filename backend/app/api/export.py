@@ -57,6 +57,7 @@ def export_records(db: Session, filters: Filters, limit: int) -> list[ExportReco
 
 
 _MD_SPECIAL = re.compile(r"([\\`*_\[\]{}<>#|!~])")
+_URL_UNSAFE = re.compile(r"[\x00-\x20<>\x7f]")  # would end a `<...>` link destination
 
 
 def md_text(s: str | None) -> str:
@@ -68,7 +69,7 @@ def md_link(title: str, url: str) -> str:
     """`[title](<url>)` for http(s) URLs only; anything else is shown as plain text (§11.9)."""
     if not url.startswith(("https://", "http://")):
         return md_text(title)
-    safe = url.replace(" ", "%20").replace("<", "%3C").replace(">", "%3E")
+    safe = _URL_UNSAFE.sub(lambda m: f"%{ord(m[0]):02X}", url)
     return f"[{md_text(title)}](<{safe}>)"
 
 
