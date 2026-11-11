@@ -1020,3 +1020,50 @@ CI run 42956055213 (PR #2) failed with `tests/test_ingest_db.py::test_concurrent
 | 8 concurrent runs, with the advisory lock | 0/25 |
 
 Full suite with the fix: `385 passed in 17.71s`; ruff, mypy clean.
+
+## Phase 11: Polish, docs & presentation (2026-11-11, branch `docs/phase-11`)
+
+`uv` was not on PATH in this session, so the backend checks ran with the project's `backend/.venv/bin` tools (the same versions `uv sync` installs). `uv lock --check --offline` (a uv binary from an earlier session) confirmed the lockfile after the version bump: `Resolved 111 packages in 2ms`.
+
+| Command | Result |
+|---|---|
+| `ruff format --check .` | `75 files already formatted` |
+| `ruff check .` | `All checks passed!` |
+| `mypy app` | `Success: no issues found in 42 source files` |
+| `TEST_DATABASE_URL=… pytest -q` (before the review fixes, `DATABASE_URL` from the local `.env`) | `1 failed, 384 passed`: `test_utc_sessions` connects with the app's `DATABASE_URL`, which in the local `.env` points to a port (55433) with nothing listening. An environment problem, the same one fixed for CI in `fb897a2` |
+| `DATABASE_URL=… TEST_DATABASE_URL=… pytest -q` (both on `newsdc_test`, 5433), before the fixes | `385 passed in 17.72s` |
+| Same, after the review fixes and the version bump | `388 passed in 17.75s` |
+| `pnpm lint --deny-warnings && pnpm typecheck` | clean |
+| `pnpm test` | `Test Files 2 passed (2)`, `Tests 12 passed (12)` (the new Markdown test was skipped before `vite.config.ts` included `.tsx`) |
+| `pnpm build` | `✓ built in 789ms` |
+| `pnpm e2e` | `1 passed (8.7s)` |
+
+### Production compose, locally
+
+Run from a `git archive HEAD` copy (snap Docker can't read `/tmp`, so the copy was in `~/Documents/newsdc-prodcheck` and deleted afterwards). It used a throwaway `.env`: `DOMAIN=localhost`, dummy DB password and admin secrets, **no `ANTHROPIC_API_KEY`**. The worker was not started, so there were no outbound fetches or LLM calls. Command: `docker compose -p newsdc-prodcheck -f docker-compose.prod.yml up -d --build db backend frontend caddy` (Docker 29.8.0).
+
+| Check (through Caddy, `https://localhost`, `-k`) | Result |
+|---|---|
+| `/api/v1/ready` | `200` |
+| `/` | `<div id="root">` |
+| `/api/v1/health` | `{"status":"ok","db":"ok","version":"0.1.0"}` (before the bump to 1.0.0) |
+| `/api/v1/admin/runs` without a cookie | `401` |
+| `/api/v1/export?format=json&limit=5` | `200` |
+| `/api/v1/docs` | `404` (`API_DOCS=false`) |
+| `/api/v1/items?page_size=1`, `/api/v1/topics` | `200`, `200` (empty database) |
+| Response headers on `/` | `strict-transport-security: max-age=31536000; includeSubDomains`, `content-security-policy: default-src 'self'; …` |
+
+Then `docker compose … down -v`.
+
+### Review pass (subagent) of `d89ad2b`
+
+The subagent traced the stream-slot release on client disconnect in a scratch script: the semaphore was back at 8 after `aclose()`, so there is no leak. It reported 6 low findings (no test for Markdown links, the disconnect test doesn't check the slot, the global Ask budget is used by no-evidence answers, the IPv4-mapped key, env proxies bypassing pinning, `Authorization` on an https → http redirect). Each has a regression test now (see CHANGELOG 1.0.0).
+
+### Live site (read-only)
+
+`GET https://news-dc.atinus.co/api/v1/stats` funnel: fetched 3,158, rejected_prefilter 30, rejected_ai 965, duplicate 82, failed 0, processed 2,081, new 0. By source: hn 2,503/1,530, arxiv 506/470, dck 52/49, ft_tech 43/9, nyt_tech 33/7, semianalysis 20/13, sth 7/6, dcd 0, github 0. Screenshots (`docs/img/`) were taken with headless Chrome from the same site.
+
+### Not checked
+- Mermaid rendering (mermaid-cli install not permitted). GitHub renders them.
+- Marp PDF export of `docs/PRESENTATION.md`.
+- 1.0.0 on the VPS and `scripts/smoke_test.sh` against it. Not merged or deployed: a push to `main` deploys, and that waits for the human.

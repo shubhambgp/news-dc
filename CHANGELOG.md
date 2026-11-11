@@ -2,7 +2,25 @@
 
 All notable changes, grouped by build phase. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [1.0.0] - 2026-11-11
+
+### Phase 11: Polish, docs & presentation (2026-11-11)
+
+#### Added
+- `README.md` rewritten: features, screenshots (`docs/img/`), architecture, quick start, environment variable table, tests, deployment, project structure, how AI agents were used, limitations and future work.
+- `docs/ARCHITECTURE.md`: Mermaid diagrams for the system, the ingestion and processing workflow with status transitions, and the Ask NewsDC (RAG) sequence, plus a table of key design decisions and trade-offs.
+- `docs/AI_CONFIG.md`: summary table (prompts with versions, models, cost per 1,000 articles), the classifier output schema, and how to switch LLM providers.
+- `docs/PRESENTATION.md`: Marp deck (15 slides) with a 5-minute demo script in the speaker notes.
+- Frontend test `src/components/Markdown.test.tsx`; Vitest now also runs `.tsx` tests.
+
+#### Fixed (code review of the security audit fixes, D-041)
+- `/ask` answers without evidence (no LLM call) no longer count against the global Ask budget.
+- Rate-limit keys: an IPv4-mapped IPv6 client (`::ffff:a.b.c.d`) is keyed by its IPv4 address instead of sharing one /64 with every IPv4 client.
+- Fetcher: `trust_env=False`, so a `HTTP(S)_PROXY` in the environment can't bypass connection pinning. `Authorization` is also dropped on an https → http redirect to the same host.
+- Test: the disconnect test checks that the stream slot is released.
+
+#### Changed
+- Version 1.0.0 (`backend/pyproject.toml`, `app.__version__`, `frontend/package.json`).
 
 ### Fix: concurrent ingest deadlock (2026-11-11)
 - Two runs of the same source writing one page could deadlock on the unique indexes of `items` and `item_sources`, failing a run (seen in CI run 42956055213). Page writes of one source are now serialized with a transaction-level advisory lock, taken after enrichment, so no network I/O happens under it. `test_concurrent_runs_do_not_duplicate` now starts 8 runs instead of 3.

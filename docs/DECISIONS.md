@@ -319,3 +319,14 @@ Each entry: context, options, decision, why, trade-offs, and whether it changes 
 - **API docs are off in production** (`API_DOCS=false` in `docker-compose.prod.yml`). Locally they stay at `/api/v1/docs`.
 - **`no-new-privileges` is not set.** Docker on the agent machine (snap) refuses to start any container with it, `alpine` included, so it couldn't be verified. `cap_drop: [ALL]` was verified: backend health 200, frontend served. Caddy and Postgres keep their default capabilities, because both start as root and need some.
 - **Not changed (see SECURITY.md):** no Trivy gate in CI. It would block deploys on base-image CVEs that have no fix in our control. The audit's other items are either actions in GitHub, Anthropic or the server, or design trade-offs recorded there.
+
+## D-041 (2026-11-11): Phase 11 scope and documentation choices
+
+- **Context:** Phase 11 is docs, presentation and a final review. The plan's architecture section says "Haiku for classification and Sonnet for chat", lists optional extras (Ollama, RSS digest, per-category RSS), and asks for an AI code review pass.
+- **Decisions:**
+  - The docs describe what runs: Opus 5.5 for Ask and the trend brief (since Phase 6, D-033), not Sonnet. The reason is in ARCHITECTURE.md and AI_CONFIG.md.
+  - The optional extras are **not built**. §17 lists them as "can be deferred transparently", and they are disclosed in README limitations and on the future-work slide. AI_CONFIG.md describes how a provider would be added.
+  - The review pass was a subagent review of the security-fix commit `d89ad2b`. It found no high-severity defect and 6 low ones, which were all fixed with regression tests (CHANGELOG 1.0.0).
+  - Screenshots are of the live site (`docs/img/`), taken with headless Chrome.
+- **Trade-offs:** the Mermaid diagrams were not rendered locally (installing mermaid-cli from npm was not permitted in this session). They rely on GitHub's renderer, and that check is pending human verification.
+- **Plan change:** none.

@@ -1,6 +1,97 @@
 # NewsDC Architecture
 
-Phase 11 adds the full system diagrams. This file documents the recommendation engine (Phase 5) and Ask NewsDC retrieval (Phase 6) for now.
+How NewsDC is put together: the processes, the ingestion and AI workflow, Ask NewsDC, the ranking formulas and the main trade-offs. The API contract is in [API.md](API.md), the AI settings in [AI_CONFIG.md](AI_CONFIG.md), production in [DEPLOYMENT.md](DEPLOYMENT.md) and every deviation from the plan in [DECISIONS.md](DECISIONS.md).
+
+## System
+
+```mermaid
+flowchart LR
+  B[Browser<br/>React SPA + localStorage profile] -->|HTTPS| C[Caddy<br/>TLS, headers, compression]
+  C -->|/api/*| A[FastAPI backend<br/>/api/v1]
+  C -->|everything else| F[Nginx<br/>static Vite build]
+  A --> P[(PostgreSQL 16<br/>+ pgvector)]
+  A -->|Ask, SSE| L[Claude API]
+  W[Worker<br/>APScheduler + jobs loop] --> P
+  W -->|HTTP, SSRF-checked| S[Sources<br/>HN, RSS, arXiv, GitHub]
+  W -->|classify, trend brief| L
+```
+
+- **Four app containers** in `docker-compose.prod.yml` (`db`, `backend`, `worker`, `frontend`) plus `caddy`. Only Caddy publishes ports (80/443). The database has no public port.
+- **Backend and worker are the same image.** The API never ingests or classifies. Admin actions and the schedule only *enqueue* rows in the `jobs` table, and the worker claims them (`SKIP LOCKED`, heartbeat leases, retries with backoff, dead letters, one active job per kind; D-026).
+- **The frontend talks to the backend only over `/api/v1`** (`frontend/src/lib/api.ts`). In production both are on one origin behind Caddy, so there is no CORS.
+- **Postgres holds everything:** items, provenance, annotations, embeddings (pgvector HNSW), full-text indexes, jobs, runs, trend briefs and Admin state (rate-limit counters are in memory). Nightly encrypted `pg_dump` (`scripts/backup_db.sh`).
+
+## Ingestion and processing workflow
+
+```mermaid
+flowchart TD
+  T[Scheduler: ingest_all every hour] --> J1[(jobs)]
+  AD[Admin: ingest / pipeline / brief] --> J1
+  J1 --> I[Ingest runner, per source]
+  I --> V{validate, canonicalize URL}
+  V -- same source external_id --> U[update engagement]
+  V -- same url_hash, other source --> PS[add item_sources row]
+  V -- new --> EN[enrich: resolve URL, full text if allowed, HN thread] --> N1[items: status new]
+  I -->|done| J2[(jobs: pipeline)]
+  J2 --> G[LangGraph, one run per new item]
+  G --> PF{prefilter}
+  PF -- no DC keywords --> RP[rejected_prefilter]
+  PF --> CL[classify: Claude Haiku, JSON schema]
+  CL -- 3 failures / invalid twice --> FL[failed]
+  CL -- budget or provider down --> N1
+  CL --> GA{gate: relevant, not spam,<br/>relevance >= 55, quality >= 40}
+  GA -- no --> RA[rejected_ai, annotation kept]
+  GA -- yes --> EM[embed: bge-small, local]
+  EM --> ND{cosine > 0.92 within 14 days?}
+  ND -- yes --> DU[duplicate, duplicate_of set]
+  ND -- no --> PR[processed: public]
+```
+
+Each source runs on its own: one failing source records its error on its `sources` row and in `pipeline_runs`, and the others go on. Pages are committed together with the source's checkpoint, so an interrupted backfill resumes where it stopped. `store` writes the annotation and the status in one transaction, and only while the item is still `new`. Every status carries a reason in `items.status_reason`.
+
+## Ask NewsDC (RAG) sequence
+
+```mermaid
+sequenceDiagram
+  participant U as Browser
+  participant A as FastAPI /ask
+  participant DB as Postgres
+  participant L as Claude (ASSISTANT_MODEL)
+  U->>A: POST /api/v1/ask {question, history}
+  A->>A: per-IP limit (10/min)
+  A->>A: embed question (local bge-small)
+  A->>DB: hybrid search: FTS (OR-ed keywords) + pgvector, RRF, top 25
+  A->>A: re-rank to 8 (retrieval, relevance, quality, freshness)
+  A->>A: global limit (30/min, 500/day), only if there is evidence
+  A-->>U: SSE sources (the 8 items, real stored URLs)
+  alt no evidence
+    A-->>U: token (fixed "not covered" answer), done. No LLM call
+  else at most 8 answers stream at once
+    A->>L: system prompt + escaped <source> blocks + question
+    loop streamed tokens
+      L-->>A: text delta
+      A->>A: CitationFilter drops [n] outside 1..8
+      A-->>U: token
+    end
+    A-->>U: done {cited, removed_citations, truncated}
+  end
+```
+
+The browser renders `[n]` as links to the source cards only, and shows any other link the model wrote as plain text. A provider error, refusal or empty answer ends the stream with an `error` event and never `done`.
+
+## Key design decisions and trade-offs
+
+| Decision | Why | Trade-off |
+|---|---|---|
+| **Postgres for everything** (data, vectors, full-text search, job queue) | One service to run, back up and secure on a 4 GB VPS. pgvector HNSW and `tsvector` are fast enough for tens of thousands of items, and both search types can be fused in one SQL query. `SKIP LOCKED` makes a durable queue without Redis | Doesn't scale like a dedicated search engine or broker. At millions of items, search would move to a separate index |
+| **Haiku for classification, Opus for Ask** (plan said Sonnet) | Classification is narrow and high volume: Haiku costs $0.29 per 1,000 articles and passed the evaluation. Ask is low volume, and its quality is what users see. Models come from env vars only (D-007) | Opus answers cost about $0.03 each, so `/ask` has per-IP and global limits and an 8-stream cap |
+| **Local embeddings** (fastembed bge-small, 384 dims, CPU) | Free, private and deterministic. No second API key or provider outage. Embedding a question takes milliseconds | Lower quality than large hosted embedding models. Changing the model means re-embedding everything (migration) |
+| **localStorage profile, no accounts** | No personal data on the server, nothing to secure or delete, and works from the first visit. The profile is sent with each For You request and validated with strict limits | The profile doesn't follow the user across devices and is lost when site data is cleared |
+| **Keyword prefilter before the LLM** | Free. It removes obvious off-topic items from broad sources (HN) before they cost money, and it is word-bounded and explainable | It can drop a relevant item that uses none of the keywords. DC-specific sources skip it |
+| **Exact dedupe by canonical URL hash plus many-to-many provenance** | One story found by HN and an RSS feed is one item with two sources, and "Also covered by" and the coverage boost come for free | Canonicalization is conservative (it doesn't rewrite http to https, D-010), so some duplicates fall to the near-duplicate step |
+| **Near-duplicates by embedding similarity** (> 0.92, ±14 days) | Catches the same announcement rewritten by different outlets, with the similarity and reason stored | A heuristic: very similar but distinct stories can be merged. The threshold is a setting |
+| **Durable jobs table instead of in-process scheduling** | Jobs survive restarts and deploys, retry with backoff and end in a dead letter that Admin can retry | More code than a cron line, but the first-load incident in Phase 10 (a container recreate killed a run) showed why it matters |
+| **Vite SPA, not Next.js** (§11.1) | The backend owns the API. A static build behind Nginx is simple to cache and has no Node server in production | No server-side rendering, so link previews and SEO are basic |
 
 ## Recommendation engine
 

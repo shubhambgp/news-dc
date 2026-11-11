@@ -2,6 +2,17 @@
 
 How NewsDC uses AI in the processing pipeline (Phase 3) and in the Ask NewsDC assistant (Phase 6): models, prompts, thresholds, limits, costs and how quality was measured.
 
+## Summary
+
+| | Prompt (version) | Model env var | Model used | Cost (measured) |
+|---|---|---|---|---|
+| Classifier (relevance, spam, categories, type, summary, insights, entities, scores) | [`classify.md`](../backend/app/prompts/classify.md) (`classify-v2`) | `CLASSIFIER_MODEL` | `claude-haiku-5-5` | **$0.29 per 1,000 classified articles** |
+| Ask NewsDC (RAG answers) | [`assistant.md`](../backend/app/prompts/assistant.md) (`assistant-v1`) | `ASSISTANT_MODEL` | `claude-opus-5-5` | $0.024–$0.036 per answer |
+| Weekly trend brief | [`trend_brief.md`](../backend/app/prompts/trend_brief.md) (`trend-brief-v1`) | `ASSISTANT_MODEL` | `claude-opus-5-5` | $0.063 per brief |
+| Embeddings (search, related, near-duplicates, For You) | n/a | fixed in code | `BAAI/bge-small-en-v1.5` (local CPU) | free |
+
+The plan suggested Sonnet for chat. Opus 5.5 was chosen instead because answer quality is the user-visible part and Ask volume is low. Switching to another model is a `.env` change (`ASSISTANT_MODEL`).
+
 ## Pipeline
 
 `backend/app/pipeline/graph.py`, one LangGraph run per item with `status = new`:
@@ -52,6 +63,27 @@ Request settings (`app/ai/llm.py`): structured outputs (`output_config.format` w
 - The prompt defines: relevance scale (90+ core DC news … <30 not about DCs; `is_relevant` only at ≥ 50), quality scale (title-only items rated by headline specificity, never above 60), spam, the 4 content types with examples, and "insights and entities only if stated in the item; no outside knowledge".
 - Prompt-injection handling: the item is sent as quoted data inside `<item>` tags with `<` and `>` escaped; the prompt says text inside the item is never an instruction. Items trying to instruct the model count as spam.
 - Changelog: `classify-v1` → `classify-v2` changed the title-only quality rule after evaluation run 1 (D-028). Items annotated with an older version can be re-queued with `python -m app.pipeline --reprocess-outdated`.
+
+### Output schema
+
+The classifier's answer is the `Classification` Pydantic model in `backend/app/ai/classify.py`. Its JSON schema is sent as the structured-output format, so the API only returns schema-valid JSON. Pydantic then checks it again, including that the category slugs exist.
+
+```jsonc
+{
+  "is_relevant": true,
+  "is_spam": false,
+  "relevance_score": 0,            // 0-100
+  "quality_score": 0,              // 0-100
+  "primary_category": "cooling",   // enum: enabled category slugs
+  "categories": ["cooling"],       // up to 6, enum
+  "content_type": "news",          // news | research | investment | engineering
+  "summary": "...",                // 1-1,500 chars
+  "key_insights": [{"type": "technical", "text": "..."}],   // up to 6; technical | business
+  "entities": {"companies": [], "technologies": [], "locations": []},   // up to 20 each
+  "tags": [],                      // up to 12, lower-cased
+  "reject_reason": null            // why it was rejected, or null
+}
+```
 
 ## Thresholds and limits
 
@@ -133,3 +165,20 @@ Ask NewsDC has no daily spend cap yet. The per-IP rate limit and the max-tokens 
 - **Schedule:** the worker enqueues a `trend_brief` job every Monday 06:00 UTC (only when `ANTHROPIC_API_KEY` and `ASSISTANT_MODEL` are set). On demand: `python -m app.jobs enqueue trend_brief`. Job retries follow the normal job lifecycle; an unusable answer (no citations, refusal, `max_tokens`) is a permanent failure.
 - **Stored per brief:** model, prompt version, input/output tokens, estimated cost. The log line adds the number of sources, cited and removed citations.
 - **Cost (measured):** first live brief on 2026-11-09: 10,152 input + 1,069 output tokens, 10 s, **$0.063** at $4/$20 per MTok. About $3 a year at one brief a week.
+
+## Switching providers
+
+The pipeline, Ask and the trend brief depend only on two small interfaces in `backend/app/ai/llm.py`:
+
+- `LLMClient.complete_json(system, user, schema, max_tokens) -> LLMResponse` for the classifier
+- `ChatLLM.stream_text(system, messages, max_tokens)`, which yields text deltas and then one `LLMResponse`, for Ask and the brief
+
+Failures are reported as `LLMError(retryable=..., fatal=...)`. The pipeline uses those two flags to decide whether to retry the item, abort the run or dead-letter the job. `AnthropicLLM` is the only implementation today. It is built in three places: `pipeline/graph.py`, `worker.py` and `api/ask.py`.
+
+To add a provider (for example a local Qwen through Ollama, which the plan lists as optional and is not built):
+
+1. Write a class with the same two methods, and map the provider's errors to `LLMError`.
+2. Choose the class from a new `LLM_PROVIDER` setting in those three places.
+3. Run `scripts/eval_classifier.py` and compare the result with [AI_EVALUATION.md](AI_EVALUATION.md) before switching.
+
+Tests use `tests/fakes.py` (`FakeLLM`, `FakeChat`), which implement the same interfaces.
