@@ -76,8 +76,8 @@ Nobody reads 3,000 items a year to find the 150 that change a decision.
 - **Watch trends:** rising topics and a weekly AI brief
 
 <div class="stats">
-<div class="stat"><b>3,158</b><span>items collected</span></div>
-<div class="stat"><b>2,081</b><span>published after AI filtering</span></div>
+<div class="stat"><b>3,163</b><span>items collected</span></div>
+<div class="stat"><b>2,083</b><span>published after AI filtering</span></div>
 <div class="stat"><b>14</b><span>configurable categories</span></div>
 <div class="stat"><b>$0.94</b><span>total AI spend so far</span></div>
 </div>
@@ -131,7 +131,7 @@ If the network fails: `demo/newsdc-demo.webm`, a 90-second captioned recording o
 1:20 Topics → Cooling. "14 categories, configurable in YAML and in Admin." Then press / and search "liquid cooling". "Hybrid search: full text plus vectors, fused with RRF."
 2:00 Ask AI: "What are the latest developments in liquid cooling?" Point at a [n] and click it: it jumps to the source card. "Each number maps to a stored article. Numbers the model invents are removed before they reach the browser."
 2:45 Second question: "Which companies are investing in nuclear power for data centers?"
-3:15 Dashboard. "3,158 collected, 2,081 published. 30 removed by the free keyword filter, 965 by the AI, 82 near-duplicates. Total AI cost so far is under one dollar."
+3:15 Dashboard. "3,163 collected, 2,083 published. 32 removed by the free keyword filter, 966 by the AI, 82 near-duplicates. Total AI cost so far is under one dollar."
 3:50 Admin: log in, open Rejected items. "Every rejection keeps its reason." Queue an ingestion and show it under jobs.
 4:30 Export Markdown, toggle the theme, press ? for the shortcuts.
 4:50 "All of it runs on one 4 GB VPS with Docker Compose."
@@ -201,11 +201,11 @@ Speaker: the diagrams with more detail are in docs/ARCHITECTURE.md (Mermaid). Wh
 
 | Funnel (live) | Items |
 |---|---|
-| Collected | 3,158 |
-| Rejected by keyword prefilter (free) | 30 |
-| Rejected by AI (with reason) | 965 |
+| Collected | 3,163 |
+| Rejected by keyword prefilter (free) | 32 |
+| Rejected by AI (with reason) | 966 |
 | Near-duplicates | 82 |
-| **Published** | **2,081** (66%) |
+| **Published** | **2,083** (66%) |
 
 </div>
 <div>
