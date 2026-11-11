@@ -2,7 +2,7 @@
 
 Each source records its exact endpoint or feed, terms and robots references, allowed fields, rate limits, attribution, last verified date, and implementation status (PLAN §15). A source is not enabled until it has been checked. Configuration lives in `config/sources.yaml`.
 
-All checks below were run by the agent on **2026-11-09** with `curl` and Python's `urllib.robotparser`. Commands and outputs are in `docs/VERIFICATION_LOG.md` (Phase 2). **Human review of every terms page: pending.**
+All checks below were run by the agent on **2026-11-09** with `curl` and Python's `urllib.robotparser`. Commands and outputs are in `docs/VERIFICATION_LOG.md` (Phase 2). **Every terms page reviewed by the human (2026-11-11).**
 
 Robots rule for full text (D-016): a page is extracted only if robots.txt allows `NewsDC`, `ClaudeBot` and `anthropic-ai`, the host is not a hard paywall, and the source lists `content_text` in `allowed_fields`.
 

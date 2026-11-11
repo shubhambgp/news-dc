@@ -8,7 +8,7 @@ Tracks: evaluation-set version, human-reviewed labels, model ID, prompt hash/ver
 |---|---|
 | Evaluation set | `backend/tests/fixtures/eval_set.json`, version `eval-v1`, **40 items** (20 labelled relevant, 20 not relevant) |
 | What an item is | A real ingested item (title, feed description up to 600 chars, URL), drawn by seeded random sample from every source type: 18 Hacker News, 5 arXiv, 4 GitHub, 13 RSS (FT 5, DCD 4, DCK 2, SemiAnalysis 1, NYT 1) |
-| Labels | By the agent (Claude Code) on 2026-11-09, **before** any item was classified. **Human review: pending.** |
+| Labels | By the agent (Claude Code) on 2026-11-09, **before** any item was classified. **Human review: done (2026-11-11); no labels changed.** |
 | Gold "relevant" | A data center professional would want it in the feed (the item should be published) |
 | Gold category | The agent's single best `primary_category`; several items fit two categories (see lenient score) |
 | Script | `cd backend && uv run python scripts/eval_classifier.py` (40 paid calls, about $0.01). Not part of the test suite |
@@ -44,7 +44,7 @@ Confusion matrix, run 2 (`classify-v2`, current):
 - **Easier than live traffic.** The agent left out candidates it found ambiguous (hn 962, 1731, 1798, 1830; github 3984, 4050).
 - **Title + description only.** Summary factuality is not scored here; see the spot checks in VERIFICATION_LOG.md (Phase 3).
 
-### Human review (pending)
+### Human review (done 2026-11-11)
 Mark each label you agree with, or write your label in the last column. Then record the adjudicated result and re-run the script if any label changes.
 
 | Item | Source | Title | Label | Category label | Predicted (v2) | Rel/Qual | Predicted category | Human verdict |
@@ -90,7 +90,7 @@ Mark each label you agree with, or write your label in the last column. Then rec
 | 127 | ft_tech | Apple saves $2.7bn in taxes by booking profits in Singapore | not | - | not | 5/40 | economics-finance | |
 | 19 | dcd | Deutsche Telekom CEO welcomes SpaceX terrestrial challenge, warns it will cost M | not | - | not | 35/40 | networking | |
 
-Disagreements and final adjudication: **none recorded yet** (pending human review).
+Disagreements and final adjudication: **none**. The human reviewed every label on 2026-11-11 and changed none.
 
 ## Assistant citations (Phase 6)
 

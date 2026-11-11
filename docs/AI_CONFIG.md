@@ -117,7 +117,7 @@ At the default `MAX_LLM_ITEMS_PER_RUN=300`, an hourly run costs at most about $0
 
 ## Evaluation
 
-40 hand-labelled real items (agent-labelled; **human review pending**). Current prompt `classify-v2`: relevance precision 20/22 (90.9%), recall 20/20 (100%), primary-category accuracy 16/20 strict, 18/20 lenient. Run 1 (`classify-v1`) had recall 15/20 because title-only HN items failed the quality gate. That finding led to v2, measured on the same items, so v2's numbers are optimistic. Full results, confusion matrices and limitations are in [AI_EVALUATION.md](AI_EVALUATION.md).
+40 hand-labelled real items (agent-labelled; human-reviewed 2026-11-11). Current prompt `classify-v2`: relevance precision 20/22 (90.9%), recall 20/20 (100%), primary-category accuracy 16/20 strict, 18/20 lenient. Run 1 (`classify-v1`) had recall 15/20 because title-only HN items failed the quality gate. That finding led to v2, measured on the same items, so v2's numbers are optimistic. Full results, confusion matrices and limitations are in [AI_EVALUATION.md](AI_EVALUATION.md).
 
 Re-run: `cd backend && uv run python scripts/eval_classifier.py` (about $0.01).
 

@@ -1067,3 +1067,14 @@ The subagent traced the stream-slot release on client disconnect in a scratch sc
 - Mermaid rendering (mermaid-cli install not permitted). GitHub renders them.
 - Marp PDF export of `docs/PRESENTATION.md`.
 - 1.0.0 on the VPS and `scripts/smoke_test.sh` against it. Not merged or deployed: a push to `main` deploys, and that waits for the human.
+
+## Human verification (2026-11-11)
+Confirmed by the human in chat on 2026-11-11 (not agent-run, so no command output):
+- Rotated the Anthropic API key that was pasted into the chat.
+- Reviewed every phase (PHASE_STATUS): UI click-through in both themes at phone width, API, For You feed, Admin login and actions, exports.
+- Reviewed the 40 eval labels (no changes) and spot checked processed and rejected items.
+- Judged the Ask NewsDC Q&A pairs and the trend brief.
+- Reviewed the source terms pages (incl. NYT/FT).
+- Set the Anthropic spend limit, GitHub branch protection, VPS password and SSH keys with `PasswordAuthentication no`.
+- Checked the Mermaid diagrams on GitHub, exported the Marp deck to PDF, rehearsed the demo and recorded the backup video.
+- Ran `docker compose up --build` locally (Phase 0 acceptance) and rotated the GitHub token.

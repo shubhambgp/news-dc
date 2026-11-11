@@ -328,5 +328,5 @@ Each entry: context, options, decision, why, trade-offs, and whether it changes 
   - The optional extras are **not built**. §17 lists them as "can be deferred transparently", and they are disclosed in README limitations and on the future-work slide. AI_CONFIG.md describes how a provider would be added.
   - The review pass was a subagent review of the security-fix commit `d89ad2b`. It found no high-severity defect and 6 low ones, which were all fixed with regression tests (CHANGELOG 1.0.0).
   - Screenshots are of the live site (`docs/img/`), taken with headless Chrome.
-- **Trade-offs:** the Mermaid diagrams were not rendered locally (installing mermaid-cli from npm was not permitted in this session). They rely on GitHub's renderer, and that check is pending human verification.
+- **Trade-offs:** the Mermaid diagrams were not rendered locally (installing mermaid-cli from npm was not permitted in this session). They rely on GitHub's renderer, and the human checked them there (2026-11-11).
 - **Plan change:** none.

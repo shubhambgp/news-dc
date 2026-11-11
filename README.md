@@ -145,7 +145,7 @@ docs/             architecture, API, AI config and evaluation, security, deploym
 
 ## How AI coding agents were used
 
-The code, tests and docs were written by Claude Code (Claude Opus 5.5), one phase at a time from [plan.md](plan.md). The human reviewed each phase, made the decisions the plan left open, set up the domain, and supplied the credentials. The agent also ran the backfills, the evaluation, live checks and a code review pass whose findings were fixed. Every task is listed with who did it and how it was verified in [docs/AI_AGENT_LOG.md](docs/AI_AGENT_LOG.md). Items still marked "pending human verification" there have not been confirmed by the human yet.
+The code, tests and docs were written by Claude Code (Claude Opus 5.5), one phase at a time from [plan.md](plan.md). The human reviewed each phase, made the decisions the plan left open, set up the domain, and supplied the credentials. The agent also ran the backfills, the evaluation, live checks and a code review pass whose findings were fixed. Every task is listed with who did it and how it was verified in [docs/AI_AGENT_LOG.md](docs/AI_AGENT_LOG.md). The human verified every item on 2026-11-11.
 
 ## Limitations and future work
 

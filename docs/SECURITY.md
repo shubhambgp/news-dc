@@ -20,7 +20,7 @@ How NewsDC handles secrets, input, output, admin access and deployment (PLAN Pha
 | `GITHUB_TOKEN` | Same pattern: new token, restart `worker`, revoke the old one | |
 | `POSTGRES_PASSWORD` | `ALTER USER newsdc PASSWORD '...'`, update `.env`, restart `backend` and `worker` | |
 
-The human should rotate the Anthropic key that was pasted into a chat during Phase 3 (PHASE_STATUS).
+The Anthropic key that was pasted into a chat during Phase 3 was rotated by the human (2026-11-11).
 
 ## Admin access
 
@@ -61,7 +61,7 @@ The human should rotate the Anthropic key that was pasted into a chat during Pha
 
 - Every response: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `X-Request-ID`. API responses: `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`. The Swagger page is left without CSP rather than given a policy that breaks it, and it is turned off in production (`API_DOCS=false`), where it would load a CDN script on the admin's origin.
 - CORS: only `CORS_ORIGINS`, with credentials (admin cookie), methods `GET`/`POST`/`PATCH`, headers `Content-Type`, `X-Request-ID`, `X-CSRF-Token`. In production the frontend and API share one origin behind Caddy, so `CORS_ORIGINS` is the site itself.
-- Frontend CSP set by Caddy (D-037): `default-src 'self'`, `script-src 'self'`, `style-src 'self' 'unsafe-inline'`, `connect-src 'self'`, `frame-ancestors 'none'`, plus HSTS. Checking it against the live app in a browser is pending DNS.
+- Frontend CSP set by Caddy (D-037): `default-src 'self'`, `script-src 'self'`, `style-src 'self' 'unsafe-inline'`, `connect-src 'self'`, `frame-ancestors 'none'`, plus HSTS. The live app works under it (human click-through, 2026-11-11).
 
 ## Deployment
 
@@ -76,5 +76,5 @@ Triage of `security-audit/` (audited `8b4c0f0`) after checking each finding agai
 | Outcome | Findings |
 |---|---|
 | Fixed in code | NDC-01 global Ask limit · NDC-02 pinned connections · NDC-05 stream cap · NDC-06 IPv6 /64 · NDC-07 model links as text · NDC-08 sessions end on restart · NDC-13 fetch deadline · NDC-15 docs off in prod · NDC-16 control characters · NDC-17 token on redirect · NDC-19 NAT64 · NDC-22 restore passphrase · NDC-10 `cap_drop` (partly) · NDC-24 Caddy/Nginx bump and pull on deploy (partly) |
-| Human action, no code | NDC-04 rotate the Anthropic key · NDC-01 set a spend limit in the Anthropic console · NDC-12 branch protection and environment reviewers · NDC-20 confirm `PasswordAuthentication no` |
+| Human action, no code (done 2026-11-11) | NDC-04 rotate the Anthropic key · NDC-01 set a spend limit in the Anthropic console · NDC-12 branch protection and environment reviewers · NDC-20 confirm `PasswordAuthentication no` |
 | Accepted or overstated | NDC-03: prompt injection can't be fixed in code. Spam is already rejected by `gate()`, so the audit's "drop summaries of spam" is already done; an adversarial eval needs paid calls. NDC-14: an HN poster already chooses their own link and title, so a redirect adds only the merge of a later duplicate. NDC-18: the global login cap is the brute-force defence, and exempting correct tokens would remove it; the CLI on the server still works. NDC-21: logged, and the per-run item cap still applies. NDC-23: dev-only, not in the bundle. NDC-09 (database superuser), NDC-11 (SHA pinning) and the CI Trivy gate are worth doing but need a server migration or a policy decision. |
