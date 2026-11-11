@@ -4,6 +4,9 @@ All notable changes, grouped by build phase. Format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Fix: concurrent ingest deadlock (2026-11-11)
+- Two runs of the same source writing one page could deadlock on the unique indexes of `items` and `item_sources`, failing a run (seen in CI run 42956055213). Page writes of one source are now serialized with a transaction-level advisory lock, taken after enrichment, so no network I/O happens under it. `test_concurrent_runs_do_not_duplicate` now starts 8 runs instead of 3.
+
 ### Security audit fixes (2026-11-11)
 
 Fixes for the audit in `security-audit/` (audited `8b4c0f0`). Decisions in D-040, triage in `docs/SECURITY.md#audit-2026-11-10`.

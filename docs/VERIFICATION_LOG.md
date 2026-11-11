@@ -1008,3 +1008,15 @@ New tests: pinned connection and rebinding, NAT64, cross-host `Authorization`, f
 ### Not checked
 - The deploy on the VPS (pull, `cap_drop`, Caddy 2.11 serving TLS). Check `docker compose ps` and the smoke test after the next deploy.
 - An Ask request against the real model.
+
+## Fix: concurrent ingest deadlock (2026-11-11, branch `fix/ingest-deadlock`)
+
+CI run 42956055213 (PR #2) failed with `tests/test_ingest_db.py::test_concurrent_runs_do_not_duplicate`: `psycopg.errors.DeadlockDetected ... while inserting index tuple (0,1) in relation "item_sources"`, `assert 1 == 0` on failed runs. Reproduced locally against `newsdc_test` on 5433:
+
+| Test setup (25 runs each) | Failures |
+|---|---|
+| 3 concurrent runs, before the fix | 0/40 (too rare to see locally) |
+| 8 concurrent runs, before the fix | 11/25 (`DeadlockDetected`) |
+| 8 concurrent runs, with the advisory lock | 0/25 |
+
+Full suite with the fix: `385 passed in 17.71s`; ruff, mypy clean.

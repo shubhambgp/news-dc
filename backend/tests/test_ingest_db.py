@@ -243,7 +243,7 @@ def test_concurrent_runs_do_not_duplicate(engine, web):
         threading.Thread(
             target=ingest_source, args=("dcd",), kwargs={"since_days": 30, "engine": engine}
         )
-        for _ in range(3)
+        for _ in range(8)
     ]
     for t in threads:
         t.start()

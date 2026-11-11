@@ -50,6 +50,7 @@ REFRESH_OVERLAP = timedelta(days=2)  # re-read recent items to refresh engagemen
 DEFAULT_MAX_ITEMS = 1000
 ENRICH_WORKERS = 8
 HN_LOOKUP_RPM = 60  # related-discussion lookups against Algolia
+ADVISORY_LOCK_BASE = 0x4E4443_0000  # + source id; keeps ingest locks apart from any others
 
 
 @dataclass
@@ -243,6 +244,9 @@ def _store_page(
     # here; the upserts below are conflict-safe if another run inserted meanwhile.
     s.commit()
     extras = {id(i): e for i, e in zip(new, enricher.many(new), strict=True)}
+    # Two runs of one source writing the same page deadlock on the unique indexes of `items` and
+    # `item_sources`. Serialize their writes until the page commits (no network I/O from here).
+    s.execute(select(func.pg_advisory_xact_lock(ADVISORY_LOCK_BASE + source.id)))
 
     for item in items:
         try:
