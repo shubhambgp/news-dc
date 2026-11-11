@@ -247,9 +247,10 @@ def ask(
     together (`RATE_LIMIT_ASK_GLOBAL`, default 30/minute and 500/day)."""
     if not allow(client_key(request), ASK_LIMIT, "ask"):
         raise ApiError(429, "rate_limited", f"rate limit exceeded: {ASK_LIMIT}")
-    if not all(allow("all", limit, "ask_global") for limit in ASK_GLOBAL_LIMITS):
-        raise ApiError(429, "rate_limited", "Ask NewsDC is busy, try again later")
     rows = retrieve(db, embedder, retrieval_query(req), assistant.is_time_sensitive(req.question))
+    # Only answers that will call the LLM use the shared budget; the no-evidence reply is free.
+    if rows and not all(allow("all", limit, "ask_global") for limit in ASK_GLOBAL_LIMITS):
+        raise ApiError(429, "rate_limited", "Ask NewsDC is busy, try again later")
     evidence, sources = [], []
     for n, r in enumerate(rows, start=1):
         item: Item = r[0]

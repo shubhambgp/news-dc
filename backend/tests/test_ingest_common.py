@@ -144,6 +144,22 @@ def test_authorization_is_not_sent_to_another_host(sleeps):
 
 
 @respx.mock
+def test_authorization_is_not_sent_over_plain_http(sleeps):
+    respx.get("https://api.example.com/a").respond(
+        302, headers={"Location": "http://api.example.com/b"}
+    )
+    hop2 = respx.get("http://api.example.com/b").respond(200)
+    with Http(sleep=sleeps) as http:
+        http.get("https://api.example.com/a", headers={"Authorization": "Bearer t"})
+    assert "authorization" not in hop2.calls.last.request.headers
+
+
+def test_env_proxies_are_ignored():
+    with Http() as http:
+        assert http._client._trust_env is False
+
+
+@respx.mock
 def test_slow_responses_hit_the_deadline(monkeypatch, sleeps):
     monkeypatch.setattr(common, "FETCH_DEADLINE", -1.0)
     respx.get("https://example.com/slow").respond(200, content=b"x")

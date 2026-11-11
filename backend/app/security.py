@@ -43,6 +43,8 @@ def client_key(request: Request) -> str:
         ip = ipaddress.ip_address(host)
     except ValueError:
         return host
+    if ip.version == 6 and ip.ipv4_mapped:  # ::ffff:a.b.c.d from a dual-stack bind
+        return str(ip.ipv4_mapped)
     return str(ipaddress.ip_network(f"{ip}/64", strict=False)) if ip.version == 6 else host
 
 

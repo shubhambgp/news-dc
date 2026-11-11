@@ -248,6 +248,13 @@ def test_no_results_answers_without_calling_the_llm(chat, monkeypatch):
     assert chat.calls == []
 
 
+def test_no_evidence_answers_do_not_use_the_global_budget(chat, monkeypatch):
+    monkeypatch.setattr(ask, "ASK_GLOBAL_LIMITS", parse_many("1/minute"))
+    monkeypatch.setattr(ask, "retrieve", lambda *a: [])
+    for _ in range(3):
+        assert client.post("/api/v1/ask", json={"question": "pizza?"}).status_code == 200
+
+
 @pytest.mark.parametrize(
     ("error", "code"),
     [
@@ -296,6 +303,7 @@ def test_client_disconnect_closes_the_llm_stream():
     got = asyncio.run(first_token_then_disconnect())
     assert got[2].startswith("event: token")
     assert llm.closed_early
+    assert ask._streams._value == ask.MAX_STREAMS  # the slot came back
 
 
 @pytest.mark.parametrize(

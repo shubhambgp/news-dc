@@ -112,6 +112,7 @@ def test_ipv6_clients_share_one_limit_per_64():
     assert key("2001:db8:0:1::1") == key("2001:db8:0:1:ffff::2") == "2001:db8:0:1::/64"
     assert key("2001:db8:0:2::1") != key("2001:db8:0:1::1")
     assert key("203.0.113.9") == "203.0.113.9"
+    assert key("::ffff:203.0.113.9") == "203.0.113.9"  # dual-stack bind: keep per-IPv4 keys
 
 
 def test_cors_allows_only_configured_origins():

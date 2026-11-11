@@ -366,6 +366,7 @@ class Http:
             timeout=httpx.Timeout(timeout, connect=5.0),
             headers={"User-Agent": USER_AGENT},
             follow_redirects=False,
+            trust_env=False,  # an env proxy would resolve hosts itself and skip the pinning
         )
         self._interval = 60.0 / rpm if rpm else 0.0
         self._next_at = 0.0
@@ -422,7 +423,9 @@ class Http:
                 if r.has_redirect_location:
                     url = urljoin(str(r.url), r.headers["location"])
                     params = None  # already part of the Location URL
-                    if headers and httpx.URL(url).host != r.url.host:  # token stays on its host
+                    nxt = httpx.URL(url)
+                    # the token stays on its host and never goes over plain http
+                    if headers and (nxt.host != r.url.host or nxt.scheme != r.url.scheme):
                         headers = {k: v for k, v in headers.items() if k.lower() != "authorization"}
                     continue
                 _raise_for_status(r)
