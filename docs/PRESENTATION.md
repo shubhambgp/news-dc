@@ -9,7 +9,7 @@ title: NewsDC
 Export (from the repo root; needs Chrome):
   npx -y @marp-team/marp-cli@4 docs/PRESENTATION.md --html --theme-set docs/theme/newsdc.css --pdf -o docs/NewsDC_Presentation.pdf
   npx -y @marp-team/marp-cli@4 docs/PRESENTATION.md --html --theme-set docs/theme/newsdc.css -o docs/NewsDC_Presentation.html
-Numbers are from the live site on 2026-11-11 and from docs/AI_EVALUATION.md. Refresh them from the Dashboard before presenting.
+Numbers are from the live site on 2026-11-16 and from docs/AI_EVALUATION.md. Refresh them from the Dashboard before presenting.
 Diagrams: docs/img/arch-*.png are rendered from the Mermaid in docs/ARCHITECTURE.md.
 -->
 
@@ -76,10 +76,10 @@ Nobody reads 3,000 items a year to find the 150 that change a decision.
 - **Watch trends:** rising topics and a weekly AI brief
 
 <div class="stats">
-<div class="stat"><b>3,163</b><span>items collected</span></div>
-<div class="stat"><b>2,083</b><span>published after AI filtering</span></div>
+<div class="stat"><b>3,445</b><span>items collected</span></div>
+<div class="stat"><b>2,182</b><span>published after AI filtering</span></div>
 <div class="stat"><b>14</b><span>configurable categories</span></div>
-<div class="stat"><b>$0.94</b><span>total AI spend so far</span></div>
+<div class="stat"><b>$1.18</b><span>live AI spend so far</span></div>
 </div>
 
 ---
@@ -131,11 +131,52 @@ If the network fails: `demo/newsdc-demo.webm`, a 90-second captioned recording o
 1:20 Topics → Cooling. "14 categories, configurable in YAML and in Admin." Then press / and search "liquid cooling". "Hybrid search: full text plus vectors, fused with RRF."
 2:00 Ask AI: "What are the latest developments in liquid cooling?" Point at a [n] and click it: it jumps to the source card. "Each number maps to a stored article. Numbers the model invents are removed before they reach the browser."
 2:45 Second question: "Which companies are investing in nuclear power for data centers?"
-3:15 Dashboard. "3,163 collected, 2,083 published. 32 removed by the free keyword filter, 966 by the AI, 82 near-duplicates. Total AI cost so far is under one dollar."
+3:15 Dashboard. "3,445 collected, 2,182 published. 76 removed by the free keyword filter, 1,097 by the AI, 90 near-duplicates. Total live AI cost is about one dollar."
 3:50 Admin: log in, open Rejected items. "Every rejection keeps its reason." Queue an ingestion and show it under jobs.
 4:30 Export Markdown, toggle the theme, press ? for the shortcuts.
 4:50 "All of it runs on one 4 GB VPS with Docker Compose."
 -->
+
+---
+
+## Raw data: where it comes from
+
+| Source | Method | Engagement | Collected | Published |
+|---|---|---|---|---|
+| Hacker News | Algolia HN API | points, comments | 2,637 | 1,579 |
+| arXiv (cs.DC, cs.AR, cs.NI, eess.SY) | arXiv API, 1 req / 3 s | none | 515 | 479 |
+| FT and NYT Technology | RSS, headline + description | none | 213 | 53 |
+| Data Center Knowledge | RSS + full text | none | 56 | 53 |
+| SemiAnalysis, ServeTheHome | RSS, metadata only | none | 33 | 23 |
+
+<p class="small">Public sources only, each checked for terms and robots.txt first (docs/SOURCE_REGISTER.md). Live, 2026-11-16. Also configured: DatacenterDynamics (403 from the VPS IP) and GitHub repository search, both with 0 items so far. The Register and The Next Platform are disabled: robots.txt forbids crawling. Sample dataset: <code>data/sample/newsdc_sample.json</code> (1,000 records).</p>
+
+---
+
+## Code, links and where it runs
+
+<div class="cols">
+<div class="card">
+
+### Links
+- **Live app:** https://news-dc.atinus.co
+- **Repository:** https://github.com/shubhambgp/news-dc (public, one monorepo: `backend/`, `frontend/`, `config/`, `docs/`)
+- **Pull requests:** #1 UI redesign · #2 security audit fixes
+- **CI/CD:** GitHub Actions, deploy on push to `main` after all checks pass
+- **Evaluation docs:** `docs/evaluation/`
+
+</div>
+<div class="card">
+
+### Local or cloud?
+- **Built on a local machine:** Ubuntu Linux, Claude Code CLI + VS Code, local Postgres 18 + pgvector for development and tests
+- **Deployed on a cloud VPS:** OVHcloud, Singapore, 2 vCPU / 4 GB, Ubuntu, Docker Compose + Caddy (HTTPS). Not AWS / GCP / Azure
+- **LLM calls:** Anthropic API (Anthropic's cloud)
+- **Embeddings:** run locally on the VPS CPU, no external call
+- **CI:** GitHub-hosted runners
+
+</div>
+</div>
 
 ---
 
@@ -201,11 +242,11 @@ Speaker: the diagrams with more detail are in docs/ARCHITECTURE.md (Mermaid). Wh
 
 | Funnel (live) | Items |
 |---|---|
-| Collected | 3,163 |
-| Rejected by keyword prefilter (free) | 32 |
-| Rejected by AI (with reason) | 966 |
-| Near-duplicates | 82 |
-| **Published** | **2,083** (66%) |
+| Collected | 3,445 |
+| Rejected by keyword prefilter (free) | 76 |
+| Rejected by AI (with reason) | 1,097 |
+| Near-duplicates | 90 |
+| **Published** | **2,182** (63%) |
 
 </div>
 <div>
@@ -260,6 +301,37 @@ Profile from reading activity: open +1, read 30 s +2, bookmark +3, dismiss −3,
 
 ---
 
+## Selecting and ranking articles by engagement
+
+<div class="cols">
+<div class="card">
+
+### Selection (per topic)
+1. Ingested from a public source, deduplicated by canonical URL
+2. Free keyword prefilter
+3. Claude Haiku: relevant, not spam, **relevance ≥ 55, quality ≥ 40**
+4. Not a near-duplicate (merged into **coverage** instead)
+5. The topic is one of the item's 1–3 AI categories
+
+**Topics:** the 14 categories from the brief, in `config/categories.yaml`, editable in Admin. Rising tags, companies and technologies are found from the data every week.
+
+</div>
+<div class="card">
+
+### Ranking: Trending = HN gravity
+`(1 + points + 2·comments + quality/10 + 5·coverage) / (age_h + 2)^1.5`
+
+- Comments count **2×** points
+- Coverage across outlets stands in for engagement where a source publishes none
+- Topic pages also sort by Latest, Relevant, Quality
+
+<p class="small">Honest gap: only HN has engagement (72% of items), and topic pages open on Latest. Fix planned: Trending as default, HN points for FT/NYT articles, a "Most discussed" sort. See docs/evaluation/3_ARTICLE_SELECTION_AND_RANKING.md.</p>
+
+</div>
+</div>
+
+---
+
 ## Ask NewsDC <span class="pill ai">RAG with citations</span>
 
 <div class="cols-21">
@@ -302,6 +374,20 @@ Profile from reading activity: open +1, read 30 s +2, bookmark +3, dismiss −3,
 - Funnel, per category, source and day, average quality, last runs
 - **AI cost** per run and in total
 - Export JSON or Markdown from here
+
+---
+
+## AI models used
+
+| Model | Open-weight or proprietary | Used for |
+|---|---|---|
+| **Claude Haiku 5.5** (Anthropic) | Proprietary, API | Classifier: relevance, spam, categories, summary, insights (≈ $0.29 per 1,000 articles) |
+| **Claude Opus 5.5** (Anthropic) | Proprietary, API | Ask NewsDC answers, weekly trend brief; **main coding agent** in Claude Code |
+| Claude Fable 5.1, Fable 5.2 (Anthropic) | Proprietary | Coding agent for the independent security audit and the assignment gap analysis |
+| Claude Sonnet 5.5 (Anthropic) | Proprietary | A few short Claude Code side sessions |
+| **BAAI/bge-small-en-v1.5** via fastembed | **Open-weight** (MIT), runs locally on CPU | 384-dim embeddings: semantic search, related items, near-duplicates, For You |
+
+<p class="small">Model IDs come from environment variables (<code>CLASSIFIER_MODEL</code>, <code>ASSISTANT_MODEL</code>), never hardcoded. An open-weight LLM (Ollama / Qwen) for classification is listed as future work, not built.</p>
 
 ---
 
@@ -368,6 +454,31 @@ An external-style audit found **24 issues** (0 critical, 1 high: Ask spend). All
 <div class="stats" style="grid-template-columns:1fr 1fr">
 <div class="stat"><b>11</b><span>phases, one PR-sized review each</span></div>
 <div class="stat"><b>41</b><span>recorded decisions</span></div>
+</div>
+
+</div>
+</div>
+
+---
+
+## Build process, time and cost
+
+<div class="cols">
+<div>
+
+- **Plan first:** a 972-line `plan.md` with 12 phases, acceptance checks and a Definition of Done
+- **One Claude Code session per phase:** "Complete Phase N. Done means acceptance checks pass"
+- **87 prompts in 30 sessions**, every one in `docs/evaluation/PROMPT_LOG.md`
+- **Human course corrections** documented with examples in `docs/evaluation/4_AI_DEVIATIONS.md`
+
+</div>
+<div>
+
+<div class="stats" style="grid-template-columns:1fr 1fr">
+<div class="stat"><b>~44 h</b><span>elapsed, 9 Nov 17:18 → 11 Nov 13:15 IST</span></div>
+<div class="stat"><b>13.4 h</b><span>active agent session time</span></div>
+<div class="stat"><b>$118.80</b><span>Claude Code, API-equivalent tokens</span></div>
+<div class="stat"><b>≈ $2.60</b><span>product AI calls so far</span></div>
 </div>
 
 </div>
