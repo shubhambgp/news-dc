@@ -10,7 +10,7 @@ How NewsDC was built, from the assignment PDF to the live site, with the prompts
 |---|---|
 | Calendar time | Mon 9 Nov 17:18 (first commit) → Wed 11 Nov 13:15 (final deck), about **44 hours elapsed**, plus planning before 9 Nov 17:18 |
 | Time with the agent working | **≈ 13.5 hours** of active session time across 30 Claude Code sessions (gaps over 30 min excluded) |
-| Human prompts | **87** (counting interruptions), all listed in [PROMPT_LOG.md](PROMPT_LOG.md) |
+| Human prompts | **87** (counting interruptions) |
 | Coding agent | Claude Code CLI, mostly Claude Opus 5.5 (1,329 of 1,446 model calls) |
 | Cost of the AI coding agent | **$118.80** at Anthropic API list prices (token counts from the transcripts); what was actually billed depends on the plan, **[TO CONFIRM]** |
 | Cost of AI inside the product | **≈ $2.60** recorded so far (classification of ~7,300 item runs locally and on the VPS, evaluation, test questions, two weekly briefs) |
@@ -100,7 +100,7 @@ The per-phase table of tasks, who did them and how they were verified is in `doc
 
 ## 2.3 c. All prompts and session summaries
 
-**[PROMPT_LOG.md](PROMPT_LOG.md)** has every human prompt from every session, verbatim (secrets redacted), with a summary of what the agent did in that session. The overview:
+Every session, with its model, the step it covered and the number of human prompts:
 
 | # | When (IST) | Session | Model | Step | Prompts |
 |---|---|---|---|---|---|

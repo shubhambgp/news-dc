@@ -468,7 +468,7 @@ An external-style audit found **24 issues** (0 critical, 1 high: Ask spend). All
 
 - **Plan first:** a 972-line `plan.md` with 12 phases, acceptance checks and a Definition of Done
 - **One Claude Code session per phase:** "Complete Phase N. Done means acceptance checks pass"
-- **87 prompts in 30 sessions**, every one in `docs/evaluation/PROMPT_LOG.md`
+- **87 prompts in 30 sessions**, summarised in `docs/evaluation/2_DEVELOPMENT_PROCESS.md`
 - **Human course corrections** documented with examples in `docs/evaluation/4_AI_DEVIATIONS.md`
 
 </div>

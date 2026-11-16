@@ -1,6 +1,6 @@
 # 4. Examples of the AI going off course, and how it was corrected
 
-Each example gives what happened, how it was noticed, the prompt that corrected it, and the result. Timestamps are IST from the session transcripts; the prompts are quoted as typed (full text in [PROMPT_LOG.md](PROMPT_LOG.md)). The examples are in order of impact.
+Each example gives what happened, how it was noticed, the prompt that corrected it, and the result. Timestamps are IST from the session transcripts; the prompts are quoted as typed. The examples are in order of impact.
 
 | # | Deviation | Noticed by | Correction |
 |---|---|---|---|

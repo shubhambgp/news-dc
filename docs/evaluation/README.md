@@ -3,7 +3,7 @@
 | # | Requested | Document |
 |---|---|---|
 | 1 | Project presentation: raw data sources, GitHub links, AI models (open-weight or proprietary), local or cloud | [NewsDC_Presentation.pdf](../NewsDC_Presentation.pdf) · [.pptx](../NewsDC_Presentation.pptx) · source [PRESENTATION.md](../PRESENTATION.md). New slides: 6 *Raw data*, 7 *Code, links and where it runs*, 12 *Selecting and ranking by engagement*, 15 *AI models used*, 19 *Build process, time and cost* |
-| 2 | Development process and AI usage: research, prompts, files, guardrails, transcripts, time per step, total cost | [2_DEVELOPMENT_PROCESS.md](2_DEVELOPMENT_PROCESS.md) and [PROMPT_LOG.md](PROMPT_LOG.md) (all 87 prompts, 30 sessions, with summaries) |
+| 2 | Development process and AI usage: research, prompts, files, guardrails, transcripts, time per step, total cost | [2_DEVELOPMENT_PROCESS.md](2_DEVELOPMENT_PROCESS.md) (includes a table of all 30 sessions and their prompts) |
 | 3 | Article selection, ranking and topic identification | [3_ARTICLE_SELECTION_AND_RANKING.md](3_ARTICLE_SELECTION_AND_RANKING.md) |
 | 4 | Examples of the AI deviating and how it was corrected | [4_AI_DEVIATIONS.md](4_AI_DEVIATIONS.md) (13 examples) |
 
